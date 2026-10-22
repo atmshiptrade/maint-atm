@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block titulo %}Mi cuenta{% endblock %}
+{% block contenido %}
+<h1><i class="ti ti-user-circle" aria-hidden="true"></i> Mi cuenta</h1>
+<p class="text-secondary">{{ usuario.nombre }} · usuario <strong>{{ usuario.usuario }}</strong> · {{ nombre_roles(usuario) }}</p>
+<div class="card" style="max-width: 32rem">
+  <div class="card-body">
+    <h2 class="h5">Cambiar contraseña</h2>
+    <form method="post">
+      {{ csrf_input }}
+      <div class="mb-3"><label class="form-label" for="actual">Contraseña actual</label>
+        <input class="form-control" id="actual" name="actual" type="password" autocomplete="current-password" required></div>
+      <div class="mb-3"><label class="form-label" for="nueva">Nueva contraseña (mínimo 8 caracteres)</label>
+        <input class="form-control" id="nueva" name="nueva" type="password" autocomplete="new-password" minlength="8" required></div>
+      <div class="mb-3"><label class="form-label" for="confirmar">Repite la nueva contraseña</label>
+        <input class="form-control" id="confirmar" name="confirmar" type="password" autocomplete="new-password" minlength="8" required></div>
+      <button class="btn btn-primary">Guardar</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

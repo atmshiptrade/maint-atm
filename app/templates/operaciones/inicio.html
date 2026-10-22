@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_viaje, badge_disponibilidad %}
+{% block titulo %}Disponibilidad{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <h1 class="mb-1"><i class="ti ti-anchor" aria-hidden="true"></i> Disponibilidad de la flota</h1>
+    <div class="text-secondary">{{ conteo.DISPONIBLE }} disponible(s) · {{ conteo.EN_SERVICIO }} en servicio · {{ conteo.INACTIVA }} inactiva(s)</div>
+  </div>
+  {% if supervisor %}<a class="btn btn-primary" href="/viajes/nuevo"><i class="ti ti-plus" aria-hidden="true"></i> Nuevo reporte de viaje</a>{% endif %}
+</div>
+
+{% if mis_viajes %}
+<h2 class="h5 mb-2">Mis viajes</h2>
+<div class="row g-3 mb-4">
+  {% for v in mis_viajes %}
+    <div class="col-md-6 col-xl-4">
+      <a class="card card-body h-100 text-decoration-none text-body tarjeta-viaje" href="/viajes/{{ v.id }}">
+        <div class="d-flex justify-content-between align-items-center gap-2"><strong class="fs-5">{{ v.codigo }}</strong> {{ badge_viaje(v.estado) }}</div>
+        <div>{{ v.lancha }} · {{ v.fecha|fecha }}</div>
+        <div class="small text-secondary">{{ [v.cliente, v.buque]|select|join(' · ') or 'Sin cliente ni buque todavía' }}</div>
+        <div class="mt-2 fw-semibold link-primary">
+          {{ 'Registrar el trayecto' if v.estado in ('BORRADOR', 'EN_CURSO') else 'Ver el reporte' }} <i class="ti ti-arrow-right" aria-hidden="true"></i>
+        </div>
+      </a>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="h5 mb-2">Lanchas</h2>
+<div class="row g-3 mb-4">
+  {% for l in lanchas %}
+    <div class="col-md-6 col-xl-4">
+      <div class="card h-100 lancha-estado lancha-{{ l.disponibilidad|lower }}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <div>
+              <div class="fw-semibold fs-5 lh-sm">{{ l.nombre }}</div>
+              <div class="small text-secondary">{{ l.codigo }}</div>
+            </div>
+            {{ badge_disponibilidad(l.disponibilidad) }}
+          </div>
+          {% if l.disponibilidad == 'EN_SERVICIO' %}
+            {% set icono = {'NAVEGANDO': 'sailboat', 'ESPERA': 'hourglass', 'DETENIDO': 'anchor'}.get(l.situacion.tipo, 'clock') %}
+            <div class="fw-semibold"><i class="ti ti-{{ icono }}" aria-hidden="true"></i> {{ l.situacion.texto }}</div>
+            <div class="small text-secondary">
+              {% if l.situacion.detalle %}{{ l.situacion.detalle }} · {% endif %}
+              {% if l.situacion.desde %}desde las {{ l.situacion.desde|hora(l.viaje.fecha) }} · {% endif %}
+              <a href="/viajes/{{ l.viaje.id }}">{{ l.viaje.codigo }}</a> · {{ l.viaje.patron }}
+            </div>
+            {% if l.viaje.cliente or l.viaje.buque %}<div class="small">{{ [l.viaje.cliente, l.viaje.buque]|select|join(' · ') }}</div>{% endif %}
+          {% elif l.ultima %}
+            <div class="small text-secondary"><i class="ti ti-map-pin" aria-hidden="true"></i> Última ubicación: {{ l.ultima.texto }} ({{ l.ultima.llegada|fechahora }})</div>
+          {% endif %}
+          {% if l.programados %}<div class="small mt-1"><i class="ti ti-calendar" aria-hidden="true"></i> {{ l.programados }} viaje(s) en borrador</div>{% endif %}
+          {% if l.falla_critica %}<div class="small text-danger mt-1"><i class="ti ti-alert-triangle" aria-hidden="true"></i> Falla crítica pendiente en Mantenimiento</div>{% endif %}
+        </div>
+        {% if supervisor and l.disponibilidad == 'DISPONIBLE' %}
+          <div class="card-footer bg-transparent">
+            <a class="btn btn-sm btn-outline-primary" href="/viajes/nuevo?lancha_id={{ l.id }}"><i class="ti ti-plus" aria-hidden="true"></i> Nuevo viaje</a>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    <div class="col-12 text-secondary">No hay lanchas registradas: las registra Mantenimiento en Maquinaria.</div>
+  {% endfor %}
+</div>
+
+{% if pendientes %}
+<h2 class="h5 mb-2">En borrador y por cerrar</h2>
+<div class="list-group mb-4">
+  {% for v in pendientes %}
+    <a class="list-group-item list-group-item-action d-flex flex-wrap gap-2 align-items-center py-3" href="/viajes/{{ v.id }}">
+      <strong>{{ v.codigo }}</strong> {{ badge_viaje(v.estado) }}
+      <span>{{ v.lancha }} · {{ v.fecha|fecha }} · {{ v.patron }}</span>
+      {% if v.cliente or v.buque %}<span class="text-secondary small">{{ [v.cliente, v.buque]|select|join(' · ') }}</span>{% endif %}
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

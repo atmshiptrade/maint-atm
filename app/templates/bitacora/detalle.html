@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block titulo %}Bitácora #{{ bitacora.id }}{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="mb-1"><i class="ti ti-notebook" aria-hidden="true"></i> Bitácora #{{ bitacora.id }}</h1>
+    <div class="text-secondary">
+      {% if bitacora.lancha_id %}<a href="/lanchas/{{ bitacora.lancha_id }}">{{ bitacora.lancha }}</a> · {% endif %}{{ bitacora.fecha|fecha }}
+      · registró {{ bitacora.registrado_nombre or '—' }} el {{ bitacora.registrado_en|fechahora }}
+      {% if bitacora.origen == 'OT' %}<span class="badge text-bg-light border">Lectura tomada al ejecutar una ODS</span>{% endif %}
+    </div>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% if puede_editar %}<a class="btn btn-outline-primary" href="/bitacora/{{ bitacora.id }}/editar"><i class="ti ti-pencil" aria-hidden="true"></i> Corregir</a>{% endif %}
+    {% if bitacora.lancha_id %}<a class="btn btn-outline-secondary" href="/bitacora?lancha_id={{ bitacora.lancha_id }}">Historial de la lancha</a>{% endif %}
+  </div>
+</div>
+
+{% if bitacora.observacion %}<div class="alert alert-light border">{{ bitacora.observacion }}</div>{% endif %}
+
+<h2 class="h5">Horómetros</h2>
+<div class="row g-3 mb-4">
+  {% for l in lecturas %}
+    <div class="col-6 col-md-3">
+      <div class="card"><div class="card-body">
+        <div class="small text-secondary">{% if l.tipo == 'GENERADOR' %}<a href="/generadores/{{ l.equipo_id }}">{{ l.etiqueta }}</a>{% else %}{{ l.etiqueta }}{% endif %}</div>
+        <div class="fs-4 fw-semibold cifra">{{ l.horometro|num }} h</div>
+        {% if l.anterior is not none %}<div class="small text-secondary">+{{ (l.horometro - l.anterior)|num }} h desde la lectura anterior</div>{% endif %}
+      </div></div>
+    </div>
+  {% else %}
+    <div class="col-12 text-secondary">Sin lecturas.</div>
+  {% endfor %}
+</div>
+
+{% if respuestas %}
+  {% set fallas = respuestas|selectattr('resultado', 'equalto', 'FALLA')|list %}
+  <h2 class="h5">Inspección
+    {% if fallas %}<span class="badge text-bg-danger">{{ fallas|length }} falla(s)</span>{% else %}<span class="badge text-bg-success">Sin fallas</span>{% endif %}
+  </h2>
+  <div class="table-responsive">
+    <table class="table tabla">
+      <thead><tr><th>Ítem</th><th>Categoría</th><th>Resultado</th><th>Comentario</th><th>ODS</th></tr></thead>
+      <tbody>
+        {% for r in respuestas %}
+          <tr class="{{ 'table-danger' if r.resultado == 'FALLA' else '' }}">
+            <td>{{ r.nombre }}</td>
+            <td class="small text-secondary">{{ r.categoria }}</td>
+            <td>{% if r.resultado == 'FALLA' %}<span class="badge text-bg-danger">Falla</span>{% elif r.resultado == 'NA' %}<span class="badge text-bg-secondary">N/A</span>{% else %}<span class="badge text-bg-success">OK</span>{% endif %}</td>
+            <td>{{ r.comentario or '' }}</td>
+            <td>{% if r.orden_id %}<a href="/ordenes/{{ r.orden_id }}">#{{ r.orden_id }}</a>{% elif r.resultado == 'FALLA' %}<span class="small text-secondary">ya tenía ODS pendiente</span>{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endif %}
+
+{% if cambios %}
+  <h2 class="h5 mt-4"><i class="ti ti-history" aria-hidden="true"></i> Correcciones</h2>
+  <div class="list-group mb-4">
+    {% for c in cambios %}
+      <div class="list-group-item">
+        <div class="d-flex flex-wrap justify-content-between gap-2">
+          <strong>{{ c.motivo }}</strong>
+          <span class="small text-secondary">{{ c.fecha|fechahora }} · {{ c.usuario or '—' }}</span>
+        </div>
+        <ul class="small mb-0 mt-1">{% for linea in c.detalle.splitlines() %}<li>{{ linea }}</li>{% endfor %}</ul>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+{% endblock %}

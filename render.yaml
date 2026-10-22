@@ -1,0 +1,39 @@
+# Blueprint de Render para la DEMO del piloto (plan gratuito, solo pruebas).
+# En Render: New → Blueprint → elige este repositorio. Crea la base y la app juntas.
+# Al crearlo, Render pide los valores marcados con "sync: false".
+services:
+  - type: web
+    name: atm-mantenimiento-demo
+    runtime: docker
+    plan: free
+    region: virginia              # la más cercana a Venezuela
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /salud
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: atm-mantenimiento-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ADMIN_USUARIO
+        value: admin
+      - key: ADMIN_PASSWORD       # clave del administrador (8+ caracteres)
+        sync: false
+      - key: CARGAR_DEMO          # datos ficticios y usuarios supervisor / mecanico
+        value: "true"
+      - key: DEMO_PASSWORD        # clave de supervisor y mecanico (8+ caracteres)
+        sync: false
+      - key: TZ
+        value: America/Caracas
+      - key: COOKIE_SEGURA        # Render sirve todo por HTTPS
+        value: "true"
+
+databases:
+  - name: atm-mantenimiento-db
+    plan: free                    # caduca a los 30 días
+    region: virginia
+    databaseName: mantenimiento
+    user: mantenimiento
+    postgresMajorVersion: "18"
+    ipAllowList: []               # solo la app de Render puede conectarse

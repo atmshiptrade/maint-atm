@@ -1,0 +1,316 @@
+/* =====================================================================
+   Identidad visual
+   Valores originales: paleta del logo de Grupo de Transporte ATM, C.A.
+   (azul marino #192A89, turquesa #00A7BF, verde agua #A9CABD). Se cambian
+   en Desarrollador → Configuración: base.html vuelve a definir estas
+   variables con los colores guardados (ver app/marca.py).
+   ===================================================================== */
+:root {
+  --color-principal: #192A89;          --color-principal-rgb: 25, 42, 137;
+  --color-principal-suave: #E8EAF3;
+  --color-principal-borde: #BABFDC;
+  --color-menu: #131F66;               --color-menu-rgb: 19, 31, 102;
+  --color-menu-oscuro: #0F1952;        --color-menu-oscuro-rgb: 15, 25, 82;
+  --color-acento: #00A7BF;             --color-acento-rgb: 0, 167, 191;
+  --color-acento-oscuro: #00879B;      --color-acento-oscuro-rgb: 0, 135, 155;
+  --color-acento-suave: #DEF4F7;
+  --color-secundario: #A9CABD;         --color-secundario-rgb: 169, 202, 189;
+  --color-fondo: #F2F6F4;
+  --color-borde: #DFE7E3;
+  --sombra: 0 1px 2px rgba(var(--color-menu-rgb), .05), 0 2px 8px rgba(var(--color-menu-rgb), .06);
+
+  --bs-body-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --bs-body-color: #1F2A44;
+  --bs-primary: var(--color-principal);
+  --bs-primary-rgb: var(--color-principal-rgb);
+  --bs-primary-text-emphasis: var(--color-menu-oscuro);
+  --bs-primary-bg-subtle: var(--color-principal-suave);
+  --bs-primary-border-subtle: var(--color-principal-borde);
+  --bs-info: var(--color-acento);
+  --bs-info-rgb: var(--color-acento-rgb);
+  --bs-link-color: var(--color-principal);
+  --bs-link-color-rgb: var(--color-principal-rgb);
+  --bs-link-hover-color: var(--color-acento-oscuro);
+  --bs-link-hover-color-rgb: var(--color-acento-oscuro-rgb);
+  --bs-border-color: var(--color-borde);
+  --bs-border-radius: .55rem;
+  --bs-border-radius-lg: .8rem;
+  --bs-focus-ring-color: rgba(var(--color-acento-rgb), .25);
+}
+
+body { background: var(--color-fondo); -webkit-font-smoothing: antialiased; }
+
+h1, .h1 {
+  font-family: "Montserrat", var(--bs-body-font-family);
+  font-weight: 700; font-size: 1.55rem; color: var(--color-menu);
+}
+h1 .ti { color: var(--color-acento); vertical-align: -.1em; margin-right: .15rem; }
+h2.h5, .h5 { font-weight: 600; color: var(--color-menu); }
+
+/* ---------------------------------------------------------------------
+   Botones y formularios con los colores de la marca
+   --------------------------------------------------------------------- */
+.btn { font-weight: 500; }
+.btn .ti { font-size: 1.15em; vertical-align: -.15em; }
+.btn-primary {
+  --bs-btn-bg: var(--color-principal); --bs-btn-border-color: var(--color-principal);
+  --bs-btn-hover-bg: var(--color-menu); --bs-btn-hover-border-color: var(--color-menu);
+  --bs-btn-active-bg: var(--color-menu-oscuro); --bs-btn-active-border-color: var(--color-menu-oscuro);
+  --bs-btn-disabled-bg: var(--color-principal); --bs-btn-disabled-border-color: var(--color-principal);
+  --bs-btn-focus-shadow-rgb: var(--color-acento-rgb);
+}
+.btn-outline-primary {
+  --bs-btn-color: var(--color-principal); --bs-btn-border-color: var(--color-principal);
+  --bs-btn-hover-bg: var(--color-principal); --bs-btn-hover-border-color: var(--color-principal); --bs-btn-hover-color: #fff;
+  --bs-btn-active-bg: var(--color-menu); --bs-btn-active-border-color: var(--color-menu); --bs-btn-active-color: #fff;
+}
+.nav-pills { --bs-nav-pills-link-active-bg: var(--color-principal); scrollbar-width: none; }
+.nav-pills::-webkit-scrollbar { display: none; }
+.nav-pills .nav-link:not(.active) { color: var(--color-principal); }
+.form-control:focus, .form-select:focus { border-color: var(--color-acento); box-shadow: 0 0 0 .25rem rgba(var(--color-acento-rgb), .2); }
+.form-check-input:checked { background-color: var(--color-acento); border-color: var(--color-acento); }
+.form-check-input:focus { border-color: var(--color-acento); box-shadow: 0 0 0 .25rem rgba(var(--color-acento-rgb), .2); }
+.form-label { font-weight: 500; }
+
+/* Pensado para tablets: objetivos táctiles de al menos 44 px */
+.form-control, .form-select, .btn:not(.btn-sm) { min-height: 2.75rem; }
+.form-check-input { width: 1.4em; height: 1.4em; }
+.form-switch .form-check-input { width: 2.6em; }
+
+/* ---------------------------------------------------------------------
+   Etiquetas de estado
+   --------------------------------------------------------------------- */
+.badge { font-weight: 600; letter-spacing: .01em; }
+.text-bg-naranja { background-color: #FD7E14 !important; color: #fff !important; }
+.text-bg-info { color: #04323A !important; }
+
+/* ---------------------------------------------------------------------
+   Estructura: menú lateral + contenido
+   --------------------------------------------------------------------- */
+.app { display: flex; min-height: 100vh; }
+.contenido { flex: 1 1 auto; min-width: 0; }
+.contenido-principal { max-width: 1440px; padding: 1.5rem 1rem 2rem; }
+@media (min-width: 768px) { .contenido-principal { padding: 1.75rem 2rem 2.5rem; } }
+
+.sidebar .offcanvas-lg {
+  --bs-offcanvas-width: 280px;
+  --bs-offcanvas-bg: var(--color-menu);
+  --bs-offcanvas-color: #fff;
+}
+.sidebar .offcanvas-header { padding: .75rem .75rem 0; }
+.sidebar .offcanvas-body { display: flex; flex-direction: column; padding: 0; }
+
+@media (min-width: 992px) {
+  .sidebar {
+    width: 264px; flex-shrink: 0;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+    background: var(--color-menu); color: #fff;
+    display: flex; flex-direction: column;
+  }
+  .sidebar .offcanvas-lg { display: flex; flex-direction: column; flex: 1 1 auto; }
+  .sidebar .offcanvas-body { flex: 1 1 auto; }
+}
+
+.sidebar-marca { display: block; padding: 1.25rem 1.25rem .75rem; text-decoration: none; }
+.sidebar-logo { display: block; width: 100%; max-width: 13rem; height: auto; max-height: 7rem; object-fit: contain; margin: 0 auto; }
+
+.sidebar-nav { padding-bottom: 1rem; }
+.sidebar-seccion {
+  padding: 1rem 1.5rem .35rem;
+  font-size: .68rem; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+  color: rgba(var(--color-secundario-rgb), .7);
+}
+.sidebar-enlace {
+  position: relative; display: flex; align-items: center; gap: .8rem;
+  margin: .1rem .75rem; padding: .6rem .8rem; min-height: 2.75rem;
+  border-radius: .65rem; text-decoration: none; font-weight: 500;
+  color: rgba(255, 255, 255, .82); transition: background-color .15s, color .15s;
+}
+.sidebar-enlace .ti { font-size: 1.35rem; color: var(--color-secundario); transition: color .15s; }
+.sidebar-enlace:hover { background: rgba(255, 255, 255, .07); color: #fff; }
+.sidebar-enlace:hover .ti { color: #fff; }
+.sidebar-enlace.activo { background: rgba(var(--color-acento-rgb), .2); color: #fff; }
+.sidebar-enlace.activo .ti { color: var(--color-acento); }
+.sidebar-enlace.activo::before {
+  content: ""; position: absolute; left: -.75rem; top: .45rem; bottom: .45rem;
+  width: 4px; border-radius: 0 4px 4px 0; background: var(--color-acento);
+}
+.sidebar-enlace:focus-visible { outline: 2px solid var(--color-acento); outline-offset: 2px; }
+
+.sidebar-usuario { margin-top: auto; padding: 1rem 1.25rem 1.25rem; border-top: 1px solid rgba(255, 255, 255, .1); color: #fff; }
+.sidebar-rol { color: var(--color-secundario); }
+.avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 2.5rem; height: 2.5rem; border-radius: 50%;
+  background: var(--color-acento); color: var(--color-menu-oscuro); font-weight: 700; font-size: .9rem;
+}
+.btn-sidebar {
+  --bs-btn-color: rgba(255, 255, 255, .85); --bs-btn-border-color: rgba(255, 255, 255, .22);
+  --bs-btn-hover-color: #fff; --bs-btn-hover-bg: rgba(255, 255, 255, .1); --bs-btn-hover-border-color: rgba(255, 255, 255, .35);
+  --bs-btn-active-color: #fff; --bs-btn-active-bg: rgba(255, 255, 255, .15);
+  padding: .4rem .5rem;
+}
+
+/* Barra superior (tablet vertical y celular) */
+.barra-superior {
+  position: sticky; top: 0; z-index: 1020;
+  display: flex; align-items: center; gap: .5rem;
+  padding: .5rem .75rem; background: var(--color-menu); color: #fff;
+  box-shadow: 0 2px 8px rgba(var(--color-menu-oscuro-rgb), .25);
+}
+.btn-menu { color: #fff; font-size: 1.6rem; line-height: 1; padding: .35rem .5rem; border: 0; }
+.btn-menu:hover, .btn-menu:focus { color: var(--color-acento); }
+.barra-marca {
+  display: flex; align-items: center; gap: .65rem; text-decoration: none; color: #fff;
+  font-family: "Montserrat", sans-serif; font-weight: 700; font-size: .95rem;
+}
+.barra-logo { height: 2rem; width: auto; max-width: 60vw; object-fit: contain; display: block; }
+
+/* ---------------------------------------------------------------------
+   Tarjetas y tablas
+   --------------------------------------------------------------------- */
+.card { border-color: var(--color-borde); border-radius: .8rem; box-shadow: var(--sombra); }
+.card-header { background: #fff; border-bottom-color: var(--color-borde); font-weight: 600; color: var(--color-menu); }
+.card-header:first-child { border-radius: calc(.8rem - 1px) calc(.8rem - 1px) 0 0; }
+.list-group { box-shadow: var(--sombra); border-radius: .8rem; }
+.list-group-item { border-color: var(--color-borde); }
+
+.table-responsive { background: #fff; border: 1px solid var(--color-borde); border-radius: .8rem; box-shadow: var(--sombra); }
+.table-responsive > .table { margin: 0 !important; }
+.card .table-responsive { border: 0; border-radius: 0 0 .8rem .8rem; box-shadow: none; }
+.tabla td, .tabla th { vertical-align: middle; padding: .7rem .75rem; }
+.tabla td:first-child, .tabla th:first-child { padding-left: 1.1rem; }
+.tabla thead th {
+  white-space: nowrap; background: #F6F9F8; color: #56627D;
+  font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  border-bottom: 1px solid var(--color-borde);
+}
+.tabla tbody tr:last-child td { border-bottom: 0; }
+.cifra { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* ---------------------------------------------------------------------
+   Inicio: indicadores
+   --------------------------------------------------------------------- */
+.indicador {
+  display: flex; flex-direction: row; align-items: center; gap: .9rem;
+  height: 100%; padding: 1rem 1.1rem; text-decoration: none; color: inherit;
+  transition: border-color .15s, transform .15s;
+}
+.indicador:hover { transform: translateY(-1px); }
+.indicador:hover { border-color: var(--color-acento); }
+.indicador-icono {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 2.9rem; height: 2.9rem; border-radius: .8rem; font-size: 1.5rem;
+}
+.indicador-numero { font-family: "Montserrat", sans-serif; font-size: 1.75rem; font-weight: 700; line-height: 1; color: var(--color-menu); }
+.indicador-texto { font-size: .82rem; color: #5B6680; margin-top: .2rem; }
+.indicador.vacio { opacity: .55; }
+.tono-rojo     { background: #FCE8EA; color: #C42B3A; }
+.tono-naranja  { background: #FFF0E3; color: #D9620A; }
+.tono-amarillo { background: #FFF6D9; color: #A87A00; }
+.tono-marino   { background: var(--color-principal-suave); color: var(--color-principal); }
+.tono-turquesa { background: var(--color-acento-suave); color: var(--color-acento-oscuro); }
+.tono-verde    { background: #E2F2EC; color: #23845A; }
+
+/* ---------------------------------------------------------------------
+   Formulario de inspección: todo viene en OK, solo se toca lo que falla
+   --------------------------------------------------------------------- */
+.checklist .item {
+  display: flex; flex-wrap: wrap; align-items: center; gap: .5rem 1rem;
+  padding: .6rem 1rem; border-bottom: 1px solid var(--color-borde);
+}
+.checklist .item:last-child { border-bottom: 0; }
+.checklist .item-nombre { flex: 1 1 14rem; }
+.checklist .btn-group .btn { min-width: 4.75rem; }
+.checklist .comentario { display: none; flex-basis: 100%; }
+.checklist .item:has(input[value="FALLA"]:checked) { background: var(--bs-danger-bg-subtle); }
+.checklist .item:has(input[value="FALLA"]:checked) .comentario { display: block; }
+.checklist .item:has(input[value="NA"]:checked) .item-nombre { color: var(--bs-secondary-color); }
+.checklist-categoria {
+  padding: .5rem 1rem; background: #F6F9F8; border-bottom: 1px solid var(--color-borde);
+  font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-acento-oscuro);
+}
+
+.resumen-fallas { position: sticky; bottom: 0; z-index: 10; }
+
+@media (max-width: 575.98px) {
+  .checklist .btn-group { width: 100%; }
+  .checklist .btn-group .btn { flex: 1; }
+}
+
+/* ---------------------------------------------------------------------
+   Inicio de sesión
+   --------------------------------------------------------------------- */
+.pagina-login {
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  background: var(--color-menu);
+  background-image:
+    radial-gradient(ellipse at 20% 0%, rgba(var(--color-acento-rgb), .22), transparent 55%),
+    radial-gradient(ellipse at 100% 100%, rgba(var(--color-secundario-rgb), .18), transparent 50%);
+}
+.pagina-login main { width: 100%; padding: 1.5rem 1rem 6rem; position: relative; z-index: 1; }
+.login-tarjeta { max-width: 26rem; margin: 0 auto; border: 0; border-radius: 1.25rem; box-shadow: 0 20px 50px rgba(0, 0, 0, .3); }
+.login-logo { display: block; width: 78%; max-width: 15rem; max-height: 10rem; object-fit: contain; margin: 0 auto 1rem; }
+.login-olas .ola-1 { fill: var(--color-acento); }
+.login-olas .ola-2 { fill: var(--color-secundario); }
+.login-olas { position: fixed; left: 0; right: 0; bottom: 0; width: 100%; height: 7rem; z-index: 0; }
+.login-pie { text-align: center; margin-top: 1.5rem; font-size: .8rem; color: rgba(255, 255, 255, .6); }
+
+/* ---------------------------------------------------------------------
+   Configuración: colores y logos
+   --------------------------------------------------------------------- */
+.color-fila {
+  display: grid; grid-template-columns: auto 1fr auto auto; column-gap: .75rem; align-items: center;
+  grid-template-areas: "selector nombre original hex" "selector uso original hex";
+  padding: .7rem 0; border-bottom: 1px solid var(--color-borde);
+}
+.color-selector { grid-area: selector; width: 3.25rem; height: 2.75rem; padding: .25rem; }
+.color-nombre { grid-area: nombre; align-self: end; }
+.color-uso { grid-area: uso; align-self: start; }
+.color-original { grid-area: original; }
+.color-hex { grid-area: hex; width: 7.25rem; text-transform: uppercase; }
+/* En el teléfono la descripción pasa abajo, a todo lo ancho */
+@media (max-width: 575.98px) {
+  .color-fila { grid-template-areas: "selector nombre original hex" "uso uso uso uso"; row-gap: .35rem; }
+  .color-nombre { align-self: center; }
+}
+.vista-previa { padding: 1rem; border-radius: .8rem; background: var(--color-fondo); }
+.logo-muestra {
+  display: flex; align-items: center; justify-content: center; min-height: 8rem; padding: 1.25rem;
+  margin-bottom: .75rem; border: 1px solid var(--color-borde); border-radius: .8rem; background: #fff;
+}
+.logo-muestra-menu { background: var(--color-menu); border-color: transparent; }
+.logo-muestra img { max-width: 100%; max-height: 6rem; object-fit: contain; }
+
+/* ---------------------------------------------------------------------
+   Operaciones: tablero y reporte de viaje
+   --------------------------------------------------------------------- */
+.texto-largo { white-space: pre-line; }
+.lancha-estado { border-left: 4px solid var(--color-borde); }
+.lancha-disponible { border-left-color: #23845A; }
+.lancha-en_servicio { border-left-color: var(--color-acento); }
+.lancha-inactiva { opacity: .7; }
+.tarjeta-viaje { transition: border-color .15s; }
+.tarjeta-viaje:hover { border-color: var(--color-acento); }
+.panel-operacion { border: 2px solid var(--color-acento); }
+.fila-correccion > td { background: var(--color-fondo); }
+.reporte dt { font-weight: 500; color: var(--bs-secondary-color); }
+.reporte dd { margin-bottom: .6rem; }
+
+/* ---------------------------------------------------------------------
+   Listas fila por fila (materiales, motivos): en el teléfono el selector
+   va arriba, a todo lo ancho, y la cantidad con el botón de quitar abajo
+   --------------------------------------------------------------------- */
+.fila-lista { display: grid; grid-template-columns: minmax(0, 1fr) 11rem auto; gap: .5rem; align-items: center; }
+@media (max-width: 575.98px) {
+  .fila-lista { grid-template-columns: minmax(0, 1fr) auto; }
+  .fila-lista > select { grid-column: 1 / -1; }
+}
+
+/* ---------------------------------------------------------------------
+   Inicio: fallas y tiempos (barras finas, siempre con su número al lado)
+   --------------------------------------------------------------------- */
+.barra { display: block; height: .5rem; border-radius: 4px; background: var(--color-fondo); overflow: hidden; }
+.barra-valor { display: block; height: 100%; min-width: 2px; border-radius: 4px; background: var(--color-principal); }
+.barra-externa { background: var(--color-acento); }
+.barra-tabla { flex: 1 1 auto; min-width: 4rem; }

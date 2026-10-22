@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block titulo %}Categorías{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Data</a></nav>
+<h1><i class="ti ti-category" aria-hidden="true"></i> Categorías</h1>
+<p class="text-secondary">Clasifican las actividades de mantenimiento y los ítems de inspección. Una categoría en uso no se
+  elimina: se desactiva y deja de aparecer en las listas, pero los registros que ya la tienen la conservan.</p>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="table-responsive">
+      <table class="table table-hover tabla">
+        <thead><tr><th>Categoría</th><th>Actividades</th><th>Ítems de inspección</th><th>Estado</th><th></th></tr></thead>
+        <tbody>
+          {% for c in categorias %}
+            <tr class="{{ '' if c.activa else 'text-secondary' }}">
+              <td class="fw-semibold">{{ c.nombre }}</td>
+              <td>{{ c.actividades }}</td>
+              <td>{{ c.total_items }}</td>
+              <td>{% if c.activa %}<span class="badge text-bg-success">Activa</span>{% else %}<span class="badge text-bg-secondary">Inactiva</span>{% endif %}</td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-sm btn-outline-secondary" href="/data/categorias/{{ c.id }}/editar"><i class="ti ti-pencil" aria-hidden="true"></i> Editar</a>
+                {% if not c.actividades and not c.total_items %}
+                  <form method="post" action="/data/categorias/{{ c.id }}/eliminar" class="d-inline"
+                        data-confirmar="¿Eliminar la categoría «{{ c.nombre }}»?">
+                    {{ csrf_input }}
+                    <button class="btn btn-sm btn-outline-danger" aria-label="Eliminar {{ c.nombre }}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="5" class="text-secondary">No hay categorías.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card">
+      <div class="card-header">Nueva categoría</div>
+      <div class="card-body">
+        <form method="post" action="/data/categorias">
+          {{ csrf_input }}
+          <div class="mb-3">
+            <label class="form-label" for="f-nombre">Nombre <span class="text-danger">*</span></label>
+            <input class="form-control" id="f-nombre" name="nombre" maxlength="80" value="{{ nueva.get('nombre', '') }}" required>
+          </div>
+          <button class="btn btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> Agregar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

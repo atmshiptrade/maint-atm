@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "macros.html" import selector_maquinaria %}
+{% block titulo %}Maquinaria · Lanchas{% endblock %}
+{% block contenido %}
+<h1><i class="ti ti-engine" aria-hidden="true"></i> Maquinaria</h1>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  {{ selector_maquinaria('lanchas') }}
+  {% if tiene_rol(usuario, 'SUPERVISOR') %}<a class="btn btn-primary" href="/lanchas/nueva"><i class="ti ti-plus" aria-hidden="true"></i> Nueva lancha</a>{% endif %}
+</div>
+<div class="table-responsive">
+  <table class="table table-hover tabla">
+    <thead><tr><th>Código</th><th>Nombre</th><th>Matrícula</th><th>Estado</th><th>Horómetro</th><th>Generador a bordo</th><th>Última bitácora</th><th>ODS pendientes</th></tr></thead>
+    <tbody>
+      {% for l in lanchas %}
+        <tr>
+          <td class="cifra">{{ l.codigo }}</td>
+          <td class="text-nowrap"><a href="/lanchas/{{ l.id }}" class="fw-semibold">{{ l.nombre }}</a></td>
+          <td>{{ l.matricula }}</td>
+          <td><span class="badge {{ 'text-bg-success' if l.estado == 'OPERATIVA' else 'text-bg-secondary' }}">{{ l.estado|capitalize }}</span></td>
+          <td class="cifra fw-semibold">{{ (l.horometro_actual|num ~ ' h') if l.horometro_actual is not none else '—' }}</td>
+          <td class="small">{{ (l.generadores or [])|join(', ') or '—' }}</td>
+          <td class="cifra">{{ l.ultima_bitacora|fecha }}</td>
+          <td>{% if l.ot_pendientes %}<a href="/ordenes?lancha_id={{ l.id }}">{{ l.ot_pendientes }}</a>{% else %}0{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="text-secondary">Todavía no hay lanchas registradas.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

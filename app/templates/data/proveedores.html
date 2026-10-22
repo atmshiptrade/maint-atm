@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area %}
+{% block titulo %}Proveedores{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Data</a></nav>
+<h1><i class="ti ti-building-store" aria-hidden="true"></i> Proveedores</h1>
+<p class="text-secondary">Empresas o talleres que hacen servicios contratados. Se eligen al reportar una ODS como
+  «servicio contratado». Un proveedor con servicios registrados no se elimina: se desactiva.</p>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="table-responsive">
+      <table class="table table-hover tabla">
+        <thead><tr><th>Proveedor</th><th>RIF</th><th>Especialidad</th><th>Contacto</th><th>Servicios</th><th></th></tr></thead>
+        <tbody>
+          {% for p in proveedores %}
+            <tr class="{{ '' if p.activo else 'text-secondary' }}">
+              <td class="fw-semibold">{{ p.nombre }}{% if not p.activo %} <span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+              <td class="cifra">{{ p.rif or '—' }}</td>
+              <td class="small">{{ p.especialidad or '—' }}</td>
+              <td class="small">{{ [p.contacto, p.telefono, p.correo]|select|join(' · ') or '—' }}</td>
+              <td>{{ p.servicios }}</td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-sm btn-outline-secondary" href="/data/proveedores/{{ p.id }}/editar"><i class="ti ti-pencil" aria-hidden="true"></i> Editar</a>
+                {% if not p.servicios %}
+                  <form method="post" action="/data/proveedores/{{ p.id }}/eliminar" class="d-inline"
+                        data-confirmar="¿Eliminar el proveedor «{{ p.nombre }}»?">
+                    {{ csrf_input }}
+                    <button class="btn btn-sm btn-outline-danger" aria-label="Eliminar {{ p.nombre }}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="text-secondary">Todavía no hay proveedores registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card">
+      <div class="card-header">Nuevo proveedor</div>
+      <div class="card-body">
+        <form method="post" action="/data/proveedores">
+          {{ csrf_input }}
+          {{ campo('nombre', 'Nombre o razón social', nuevo, requerido=true, attrs='maxlength="150"') }}
+          {{ campo('rif', 'RIF', nuevo, attrs='maxlength="20" placeholder="J-12345678-9"') }}
+          {{ campo('especialidad', 'Especialidad', nuevo, attrs='placeholder="Ej. Motores fuera de borda, electricidad"') }}
+          {{ campo('contacto', 'Persona de contacto', nuevo) }}
+          {{ campo('telefono', 'Teléfono', nuevo, tipo='tel') }}
+          {{ campo('correo', 'Correo', nuevo, tipo='email') }}
+          {{ area('notas', 'Notas', nuevo, filas=2) }}
+          <button class="btn btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> Registrar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

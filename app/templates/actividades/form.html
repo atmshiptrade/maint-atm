@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area, selector, casilla, selector_categoria, modal_categoria, lista_materiales, modal_catalogo, script_filas %}
+{% block titulo %}{{ 'Editar' if actividad.id else 'Nueva' }} actividad{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data/actividades" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Actividades</a></nav>
+<h1>{{ 'Editar actividad #%s'|format(actividad.id) if actividad.id else 'Nueva actividad' }}</h1>
+<form method="post" class="card card-body" style="max-width: 48rem">
+  {{ csrf_input }}
+  {{ campo('nombre', 'Nombre de la actividad', actividad, requerido=true) }}
+  <div class="row">
+    <div class="col-sm-6">
+      {{ selector_categoria(categorias, actividad.categoria_id) }}
+    </div>
+    <div class="col-sm-6">{{ selector('severidad', 'Severidad', [('CRITICA', 'Crítica'), ('ALTA', 'Alta'), ('MEDIA', 'Media'), ('BAJA', 'Baja')], actividad.severidad, requerido=true) }}</div>
+  </div>
+  <div class="row">
+    <div class="col-sm-4">{{ campo('tolerancia_pct', 'Tolerancia (%)', actividad, tipo='number', requerido=true,
+          ayuda='10 % de 400 h: se puede hacer entre 360 h y 440 h. La ODS se abre al entrar en esa ventana.',
+          attrs='step="0.5" min="0" max="50" inputmode="decimal"') }}</div>
+    <div class="col-sm-4">{{ campo('tiempo_estimado_h', 'Tiempo estimado (horas)', actividad, tipo='number', attrs='step="0.25" min="0" inputmode="decimal"') }}</div>
+  </div>
+  <fieldset class="border rounded p-3 mb-3">
+    <legend class="fs-6 w-auto px-1 mb-0">Intervalo sugerido <span class="text-secondary small">(precarga el formulario de tareas)</span></legend>
+    <div class="row">
+      <div class="col-sm-6">{{ campo('intervalo_horas_sugerido', 'Cada cuántas horas de uso', actividad, tipo='number', attrs='step="1" min="1" inputmode="numeric"') }}</div>
+      <div class="col-sm-6">{{ campo('intervalo_dias_sugerido', 'Cada cuántos días', actividad, tipo='number', attrs='step="1" min="1" inputmode="numeric"') }}</div>
+    </div>
+    <div class="form-text">Si llenas ambos, la tarea vence con lo que ocurra primero.</div>
+  </fieldset>
+  {{ lista_materiales(opciones_materiales, filas_materiales, 'Herramientas y repuestos a usar', nuevo=true,
+        ayuda='Se precargan en la ODS preventiva; el mecánico ajusta allí lo que realmente usó.') }}
+  {{ area('materiales', 'Otros materiales o notas', actividad, filas=2, ayuda='Lo que no está en la lista.') }}
+  {{ area('descripcion', 'Descripción / procedimiento', actividad, filas=3) }}
+  {{ casilla('activa', 'Actividad activa', actividad.activa) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="/data/actividades">Cancelar</a>
+  </div>
+</form>
+{{ modal_categoria() }}
+{{ modal_catalogo(cat_materiales, '', sugerencias_materiales) }}
+{% endblock %}
+
+{% block scripts %}{{ script_filas() }}{% endblock %}

@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area, etiqueta, modal_catalogo %}
+{% block titulo %}{{ 'Nuevo reporte de viaje' if not viaje else 'Editar ' ~ viaje.codigo }}{% endblock %}
+{% block contenido %}
+{% set nuevo = not viaje %}
+{% set fijar_asignacion = supervisor and (nuevo or viaje.estado in ('BORRADOR', 'CERRADO')) %}
+<nav aria-label="Ruta"><a href="{{ '/viajes' if nuevo else '/viajes/%s'|format(viaje.id) }}" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> {{ 'Reportes de viaje' if nuevo else viaje.codigo }}</a></nav>
+<h1><i class="ti ti-route" aria-hidden="true"></i> {{ 'Nuevo reporte de viaje' if nuevo else 'Encabezado del ' ~ viaje.codigo }}</h1>
+{% if nuevo %}<p class="text-secondary">El código (PLC-0001, PLC-0002…) se asigna al guardar. Solo la lancha y el patrón son obligatorios ahora;
+  lo demás se puede completar después, antes del cierre.</p>{% endif %}
+
+<form method="post" style="max-width: 60rem" id="form-viaje">
+  {{ csrf_input }}
+  {% if viaje and viaje.estado == 'CERRADO' %}
+    <div class="alert alert-warning">
+      <label class="form-label fw-semibold" for="f-motivo_enmienda">Este reporte está cerrado: el cambio queda registrado como enmienda. Motivo <span class="text-danger">*</span></label>
+      <textarea class="form-control" id="f-motivo_enmienda" name="motivo_enmienda" rows="2" required>{{ valores.motivo_enmienda or '' }}</textarea>
+    </div>
+  {% endif %}
+
+  <div class="card mb-3">
+    <div class="card-header"><i class="ti ti-ship" aria-hidden="true"></i> Viaje</div>
+    <div class="card-body row gx-3">
+      {% if supervisor %}
+        <div class="col-sm-4">{{ campo('fecha', 'Fecha', valores, tipo='date', requerido=true) }}</div>
+      {% else %}
+        <div class="col-sm-4 mb-3"><div class="form-label">Fecha</div><div>{{ viaje.fecha|fecha }}</div></div>
+      {% endif %}
+      {% if fijar_asignacion %}
+        <div class="col-sm-4 mb-3">
+          {{ etiqueta('Lancha', true, 'f-lancha_id') }}
+          <select class="form-select" id="f-lancha_id" name="lancha_id" required>
+            <option value="">Elige…</option>
+            {% for l in lanchas %}
+              <option value="{{ l.id }}"{% if l.id|string == valores.lancha_id|string %} selected{% endif %}>
+                {{ l.nombre }}{% if l.en_viaje %} · en servicio ({{ l.en_viaje }}){% endif %}{% if l.falla_critica %} · ⚠ falla crítica{% endif %}{% if l.estado == 'INACTIVA' %} · inactiva{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Solo lanchas operativas. Una lancha en servicio puede tener viajes en borrador para después.</div>
+        </div>
+        <div class="col-sm-4 mb-3">
+          {{ etiqueta('Patrón', true, 'f-patron_id') }}
+          <select class="form-select" id="f-patron_id" name="patron_id" required>
+            <option value="">Elige…</option>
+            {% for p in patrones %}
+              <option value="{{ p.id }}"{% if p.id|string == valores.patron_id|string %} selected{% endif %}>{{ p.nombre }}{% if p.en_viaje %} · en viaje ({{ p.en_viaje }}){% endif %}</option>
+            {% endfor %}
+          </select>
+          {% if not patrones %}<div class="form-text text-danger">No hay usuarios con rol Patrón: el administrador los crea en Usuarios.</div>{% endif %}
+        </div>
+      {% else %}
+        <div class="col-sm-4 mb-3"><div class="form-label">Lancha</div><div>{{ viaje.lancha }}</div></div>
+        <div class="col-sm-4 mb-3"><div class="form-label">Patrón</div><div>{{ viaje.patron }}</div></div>
+      {% endif %}
+      <div class="col-sm-6">{{ campo('requisicion', 'N° de requisición comercial', valores, attrs='maxlength="40" placeholder="RQC/PCPAL/CM-001"') }}</div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><i class="ti ti-briefcase" aria-hidden="true"></i> Buque y cliente</div>
+    <div class="card-body row gx-3">
+      <div class="col-sm-6 mb-3">
+        {{ etiqueta('Buque', false, 'f-buque_id') }}
+        <div class="input-group">
+          <select class="form-select" id="f-buque_id" name="buque_id">
+            <option value="">—</option>
+            {% for b in buques %}
+              <option value="{{ b.id }}"{% if b.id|string == valores.buque_id|string %} selected{% endif %}>{{ b.nombre }}{% if b.imo %} · IMO {{ b.imo }}{% endif %}</option>
+            {% endfor %}
+          </select>
+          {% if supervisor %}<button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-buques"><i class="ti ti-plus" aria-hidden="true"></i> Nuevo</button>{% endif %}
+        </div>
+        <div class="form-text">Bandera, IMO, tipo, arqueo y eslora vienen del catálogo de buques.</div>
+      </div>
+      <div class="col-sm-6 mb-3">
+        {{ etiqueta('Al servicio de (cliente)', false, 'f-cliente_id') }}
+        <div class="input-group">
+          <select class="form-select" id="f-cliente_id" name="cliente_id">
+            <option value="">—</option>
+            {% for c in clientes %}<option value="{{ c.id }}"{% if c.id|string == valores.cliente_id|string %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+          </select>
+          {% if supervisor %}<button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#modal-clientes"><i class="ti ti-plus" aria-hidden="true"></i> Nuevo</button>{% endif %}
+        </div>
+      </div>
+      <div class="col-sm-6">{{ campo('solicitado_por', 'Servicio solicitado por', valores, attrs='maxlength="150" placeholder="Persona que pidió el servicio"') }}</div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-md-6">
+      <fieldset class="card h-100">
+        <legend class="card-header fs-6 mb-0"><i class="ti ti-list-details" aria-hidden="true"></i> Tipo de servicio a ser ejecutado</legend>
+        <div class="card-body">
+          {% for s in tipos_servicio %}
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="servicios" value="{{ s.id }}" id="servicio-{{ s.id }}"{% if s.id in valores.servicios %} checked{% endif %}>
+              <label class="form-check-label" for="servicio-{{ s.id }}">{{ s.nombre }}</label>
+            </div>
+          {% endfor %}
+          {{ campo('servicio_otro', 'Otros', valores, attrs='maxlength="150"') }}
+        </div>
+      </fieldset>
+    </div>
+    <div class="col-md-6">
+      <fieldset class="card h-100">
+        <legend class="card-header fs-6 mb-0"><i class="ti ti-map-pin" aria-hidden="true"></i> Área donde se ejecutará el servicio</legend>
+        <div class="card-body">
+          {% for tipo, titulo in [('AREA', none), ('MUELLE', 'Muelle (si aplica)')] %}
+            {% set grupo = ubicaciones|selectattr('tipo', 'equalto', tipo)|list %}
+            {% if grupo and titulo %}<div class="small text-secondary mt-2 mb-1">{{ titulo }}</div>{% endif %}
+            {% for u in grupo %}
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="areas" value="{{ u.id }}" id="area-{{ u.id }}"{% if u.id in valores.areas %} checked{% endif %}>
+                <label class="form-check-label" for="area-{{ u.id }}">{{ u.nombre }}</label>
+              </div>
+            {% endfor %}
+          {% endfor %}
+          {% if not ubicaciones %}<p class="text-secondary small mb-0">No hay ubicaciones: se registran en Data → Ubicaciones.</p>{% endif %}
+        </div>
+      </fieldset>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><i class="ti ti-users-group" aria-hidden="true"></i> Marinos</div>
+    <div class="card-body">
+      <div class="row">
+        {% for m in marinos %}
+          <div class="col-sm-6 col-lg-4">
+            <div class="form-check mb-2">
+              <input class="form-check-input" type="checkbox" name="marinos" value="{{ m.id }}" id="marino-{{ m.id }}"{% if m.id in valores.marinos %} checked{% endif %}>
+              <label class="form-check-label" for="marino-{{ m.id }}">{{ m.nombre }}</label>
+            </div>
+          </div>
+        {% else %}
+          <p class="text-secondary small mb-0">No hay marinos registrados: se agregan en Data → Marinos.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header"><i class="ti ti-file-description" aria-hidden="true"></i> Descripción del servicio</div>
+    <div class="card-body">{{ area('descripcion', 'Qué se hizo en el servicio', valores, filas=4) }}</div>
+  </div>
+
+  <div class="d-flex gap-2 mb-4">
+    <button class="btn btn-primary"><i class="ti ti-device-floppy" aria-hidden="true"></i> {{ 'Crear reporte' if nuevo else 'Guardar' }}</button>
+    <a class="btn btn-outline-secondary" href="{{ '/viajes' if nuevo else '/viajes/%s'|format(viaje.id) }}">Cancelar</a>
+  </div>
+</form>
+
+{% if supervisor %}
+  {{ modal_catalogo(cat_buques, 'f-buque_id', sugerencias) }}
+  {{ modal_catalogo(cat_clientes, 'f-cliente_id') }}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Alta al vuelo de buques y clientes: se guarda en Data y queda elegido en el reporte
+  document.querySelectorAll('.form-al-vuelo').forEach(formulario => {
+    const aviso = formulario.querySelector('[data-error]');
+    formulario.addEventListener('submit', async evento => {
+      evento.preventDefault();
+      aviso.textContent = '';
+      const datos = new FormData(formulario);
+      datos.append('csrf', document.querySelector('#form-viaje input[name="csrf"]').value);
+      const respuesta = await fetch(`/data/${formulario.dataset.clave}`, { method: 'POST', body: datos, headers: { Accept: 'application/json' } });
+      const resultado = await respuesta.json().catch(() => ({ error: 'No se pudo guardar. Intenta de nuevo.' }));
+      if (!respuesta.ok) { aviso.textContent = resultado.error || 'No se pudo guardar.'; return; }
+      document.getElementById(formulario.dataset.selector).add(new Option(resultado.nombre, resultado.id, true, true));
+      formulario.reset();
+      bootstrap.Modal.getOrCreateInstance(formulario.closest('.modal')).hide();
+    });
+  });
+</script>
+{% endblock %}

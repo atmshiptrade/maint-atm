@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, casilla %}
+{% block titulo %}Editar categoría{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data/categorias" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Categorías</a></nav>
+<h1><i class="ti ti-category" aria-hidden="true"></i> Editar categoría</h1>
+<form method="post" class="card card-body" style="max-width: 32rem">
+  {{ csrf_input }}
+  {{ campo('nombre', 'Nombre', categoria, requerido=true, ayuda='El cambio de nombre se ve en todas las actividades e ítems que la usan.', attrs='maxlength="80"') }}
+  {{ casilla('activa', 'Activa (aparece en las listas desplegables)', categoria.activa) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="/data/categorias">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

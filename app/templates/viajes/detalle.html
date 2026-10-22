@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_viaje, selector_punto %}
+{% block titulo %}{{ viaje.codigo }}{% endblock %}
+
+
+{% block contenido %}
+{# Campo de motivo para corregir un reporte cerrado (la base exige el motivo de la enmienda) #}
+{% macro motivo_enmienda(id) -%}
+  {% if viaje.estado == 'CERRADO' %}
+    <div class="col-12">
+      <label class="form-label small mb-1" for="{{ id }}">Motivo de la enmienda <span class="text-danger">*</span></label>
+      <input class="form-control" id="{{ id }}" name="motivo_enmienda" required maxlength="300" placeholder="Por qué se corrige un reporte cerrado">
+    </div>
+  {% endif %}
+{%- endmacro %}
+<nav aria-label="Ruta"><a href="/viajes" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Reportes de viaje</a></nav>
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="mb-1"><i class="ti ti-route" aria-hidden="true"></i> {{ viaje.codigo }} {{ badge_viaje(viaje.estado) }}</h1>
+    <div class="text-secondary">{{ viaje.fecha|fecha }} · {{ viaje.lancha }} · Patrón: {{ viaje.patron }}</div>
+  </div>
+  {% if puede_editar %}
+    <a class="btn btn-outline-secondary" href="/viajes/{{ viaje.id }}/editar"><i class="ti ti-pencil" aria-hidden="true"></i>
+      {{ 'Enmendar encabezado' if viaje.estado == 'CERRADO' else 'Completar encabezado' }}</a>
+  {% endif %}
+</div>
+
+{% if falla_critica and viaje.estado in ('BORRADOR', 'EN_CURSO') %}
+  <div class="alert alert-warning py-2"><i class="ti ti-alert-triangle" aria-hidden="true"></i> La lancha tiene una falla crítica pendiente en Mantenimiento.</div>
+{% endif %}
+{% if viaje.estado == 'CANCELADO' %}
+  <div class="alert alert-secondary"><strong>Reporte cancelado.</strong> {{ viaje.motivo_cancelacion }}</div>
+{% endif %}
+
+{# ---------------- Panel del patrón: botones del trayecto ---------------- #}
+{% if puede_operar %}
+<div class="card mb-4 panel-operacion">
+  <div class="card-body">
+    {% set icono = {'NAVEGANDO': 'sailboat', 'ESPERA': 'hourglass', 'DETENIDO': 'anchor'}.get(t.situacion.tipo, 'clock') %}
+    <div class="d-flex align-items-center gap-3 mb-3">
+      <span class="indicador-icono tono-turquesa"><i class="ti ti-{{ icono }}" aria-hidden="true"></i></span>
+      <div>
+        <div class="fs-5 fw-semibold lh-sm">{{ t.situacion.texto }}</div>
+        <div class="text-secondary">{{ [t.situacion.detalle, ('desde las ' ~ t.situacion.desde|hora(viaje.fecha)) if t.situacion.desde]|select|join(' · ') }}</div>
+      </div>
+    </div>
+
+    {% if t.navegando %}
+      <form method="post" action="/viajes/{{ viaje.id }}/llegada" class="row g-2 align-items-end">
+        {{ csrf_input }}
+        <div class="col-sm-7">
+          <label class="form-label" for="llegada-destino">Llegó a</label>
+          {{ selector_punto('destino', 'llegada-destino', ubicaciones, t.navegando.punto, viaje.buque, vacio='Elige…') }}
+        </div>
+        <div class="col-sm-5"><button class="btn btn-primary btn-lg w-100"><i class="ti ti-anchor" aria-hidden="true"></i> Llegué</button></div>
+      </form>
+    {% elif t.esperando %}
+      <form method="post" action="/viajes/{{ viaje.id }}/espera/fin" class="row g-2 align-items-end">
+        {{ csrf_input }}
+        <div class="col-sm-7">
+          <label class="form-label" for="espera-motivo-fin">Motivo de la espera</label>
+          <input class="form-control" id="espera-motivo-fin" name="motivo" maxlength="200" value="{{ t.esperando.motivo or '' }}" placeholder="Ej. Esperando al práctico">
+        </div>
+        <div class="col-sm-5"><button class="btn btn-primary btn-lg w-100"><i class="ti ti-player-play" aria-hidden="true"></i> Fin de espera</button></div>
+      </form>
+    {% else %}
+      <div class="row g-4">
+        <form method="post" action="/viajes/{{ viaje.id }}/zarpe" class="col-lg-7">
+          {{ csrf_input }}
+          <div class="row g-2">
+            {% if not t.tramos %}
+              <div class="col-sm-6">
+                <label class="form-label" for="zarpe-origen">Sale de</label>
+                {{ selector_punto('origen', 'zarpe-origen', ubicaciones, ('U' ~ origen_sugerido) if origen_sugerido else '', viaje.buque, vacio='Elige…') }}
+              </div>
+            {% endif %}
+            <div class="{{ 'col-sm-6' if not t.tramos else 'col-12' }}">
+              <label class="form-label" for="zarpe-rumbo">Rumbo a (opcional)</label>
+              {{ selector_punto('rumbo', 'zarpe-rumbo', ubicaciones, '', viaje.buque, vacio='Por confirmar', requerido=false) }}
+            </div>
+          </div>
+          <button class="btn btn-primary btn-lg w-100 mt-2"><i class="ti ti-sailboat" aria-hidden="true"></i> Zarpé</button>
+        </form>
+        <div class="col-lg-5 d-flex flex-column gap-3">
+          <form method="post" action="/viajes/{{ viaje.id }}/espera/inicio">
+            {{ csrf_input }}
+            <label class="form-label" for="espera-motivo">Motivo de la espera (opcional)</label>
+            <input class="form-control mb-2" id="espera-motivo" name="motivo" maxlength="200" placeholder="Ej. Esperando pasajeros">
+            <button class="btn btn-outline-primary btn-lg w-100"><i class="ti ti-hourglass" aria-hidden="true"></i> Inicio de espera</button>
+          </form>
+          {% if t.tramos %}
+            <form method="post" action="/viajes/{{ viaje.id }}/finalizar"
+                  data-confirmar="¿Finalizar el viaje? El supervisor lo revisará y lo cerrará.">
+              {{ csrf_input }}
+              <button class="btn btn-success btn-lg w-100"><i class="ti ti-flag-check" aria-hidden="true"></i> Finalizar viaje</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+    <p class="small text-secondary mt-3 mb-0">La hora la pone el sistema al pulsar. Si algo quedó mal, corrígelo abajo en el trayecto.</p>
+  </div>
+</div>
+{% elif viaje.estado == 'FINALIZADO' %}
+<div class="alert alert-info d-flex flex-wrap align-items-center gap-2">
+  <span><i class="ti ti-flag-check" aria-hidden="true"></i> Viaje finalizado el {{ viaje.finalizado_en|fechahora }}: falta el cierre del supervisor.</span>
+  <span class="ms-auto d-flex flex-wrap gap-2">
+    {% if puede_editar %}
+      <form method="post" action="/viajes/{{ viaje.id }}/reanudar">{{ csrf_input }}
+        <button class="btn btn-sm btn-outline-primary">Reanudar el viaje</button></form>
+    {% endif %}
+    {% if supervisor %}
+      <form method="post" action="/viajes/{{ viaje.id }}/cerrar" data-confirmar="¿Cerrar el reporte? Después solo se corrige con enmienda.">{{ csrf_input }}
+        <button class="btn btn-sm btn-success"><i class="ti ti-lock" aria-hidden="true"></i> Cerrar reporte</button></form>
+    {% endif %}
+  </span>
+</div>
+{% endif %}
+
+{# ---------------- Reporte (como el formato ATM-RG-OP-002) ---------------- #}
+<div class="row g-4">
+  <div class="col-xl-5">
+    <div class="card mb-4">
+      <div class="card-header"><i class="ti ti-file-text" aria-hidden="true"></i> Reporte de viaje</div>
+      <div class="card-body">
+        <dl class="row mb-0 reporte">
+          <dt class="col-sm-5">Buque</dt>
+          <dd class="col-sm-7">{% if viaje.buque %}{{ viaje.buque }}
+            <div class="small text-secondary">{{ ['Bandera ' ~ viaje.bandera if viaje.bandera, 'IMO ' ~ viaje.imo if viaje.imo, viaje.tipo_buque,
+              (viaje.arqueo_bruto|num ~ ' GT') if viaje.arqueo_bruto, ('eslora ' ~ viaje.eslora|num ~ ' m') if viaje.eslora]|select|join(' · ') }}</div>
+            {% else %}—{% endif %}</dd>
+          <dt class="col-sm-5">N° requisición comercial</dt><dd class="col-sm-7">{{ viaje.requisicion or '—' }}</dd>
+          <dt class="col-sm-5">Al servicio de</dt><dd class="col-sm-7">{{ viaje.cliente or '—' }}</dd>
+          <dt class="col-sm-5">Solicitado por</dt><dd class="col-sm-7">{{ viaje.solicitado_por or '—' }}</dd>
+          <dt class="col-sm-5">Tipo de servicio</dt>
+          <dd class="col-sm-7">{{ ((servicios|map(attribute='nombre')|list) + ([viaje.servicio_otro] if viaje.servicio_otro else []))|join(' · ') or '—' }}</dd>
+          <dt class="col-sm-5">Área</dt><dd class="col-sm-7">{{ areas|map(attribute='nombre')|join(' · ') or '—' }}</dd>
+          <dt class="col-sm-5">Patrón</dt><dd class="col-sm-7">{{ viaje.patron }}</dd>
+          <dt class="col-sm-5">Marinos</dt><dd class="col-sm-7">{{ marinos|map(attribute='nombre')|join(' · ') or '—' }}</dd>
+          <dt class="col-sm-5">Tiempo total de espera</dt>
+          <dd class="col-sm-7">{{ viaje.espera_total|duracion }}
+            {% set motivos = t.esperas|map(attribute='motivo')|select|unique|list %}
+            {% if motivos %}<div class="small text-secondary">Motivo: {{ motivos|join('; ') }}</div>{% endif %}</dd>
+          <dt class="col-sm-12 mt-2">Descripción del servicio</dt>
+          <dd class="col-sm-12 texto-largo">{{ viaje.descripcion or '—' }}</dd>
+          {% if viaje.estado == 'CERRADO' %}
+            <dt class="col-sm-5 mt-2">Cerrado</dt><dd class="col-sm-7 mt-2">{{ viaje.cerrado_en|fechahora }}{% if viaje.cerrado_por_nombre %} por {{ viaje.cerrado_por_nombre }}{% endif %}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+
+  {# ---------------- Trayecto ---------------- #}
+  <div class="col-xl-7">
+    <h2 class="h5">Descripción del trayecto</h2>
+    <div class="table-responsive mb-2">
+      <table class="table tabla align-middle">
+        <thead><tr><th>#</th><th>Salió de</th><th>Hora</th><th>Llegó a</th><th>Hora</th><th>Duración</th>{% if puede_editar %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+          {% for x in t.tramos %}
+            <tr>
+              <td class="text-secondary">{{ loop.index }}</td>
+              <td>{{ x.origen or '—' }}</td>
+              <td class="cifra">{{ x.salida|hora(viaje.fecha) }}</td>
+              <td>{{ x.destino or '—' }}{% if not x.llegada %} <span class="badge text-bg-info">navegando</span>{% endif %}</td>
+              <td class="cifra">{{ x.llegada|hora(viaje.fecha) }}</td>
+              <td class="cifra small">{{ x.duracion|duracion }}</td>
+              {% if puede_editar %}
+                <td class="text-end"><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#corregir-tramo-{{ x.id }}" aria-expanded="false" aria-controls="corregir-tramo-{{ x.id }}">Corregir</button></td>
+              {% endif %}
+            </tr>
+            {% if puede_editar %}
+              <tr class="collapse fila-correccion" id="corregir-tramo-{{ x.id }}"><td colspan="7">
+                <form method="post" action="/viajes/{{ viaje.id }}/tramos/{{ x.id }}" class="row g-2 align-items-end">
+                  {{ csrf_input }}
+                  {% if loop.first %}
+                    <div class="col-md-6">
+                      <label class="form-label small mb-1" for="origen-{{ x.id }}">Salió de</label>
+                      {{ selector_punto('origen', 'origen-' ~ x.id, ubicaciones, 'BUQUE' if viaje.origen_buque else ('U' ~ viaje.origen_id), viaje.buque) }}
+                    </div>
+                  {% endif %}
+                  <div class="col-md-6">
+                    <label class="form-label small mb-1" for="salida-{{ x.id }}">Salida</label>
+                    <input class="form-control" type="datetime-local" id="salida-{{ x.id }}" name="salida" value="{{ x.salida|valor_fechahora }}" required>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small mb-1" for="destino-{{ x.id }}">Llegó a</label>
+                    {{ selector_punto('destino', 'destino-' ~ x.id, ubicaciones, x.punto, viaje.buque, vacio='—', requerido=false) }}
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label small mb-1" for="llegada-{{ x.id }}">Llegada</label>
+                    <input class="form-control" type="datetime-local" id="llegada-{{ x.id }}" name="llegada" value="{{ x.llegada|valor_fechahora }}"{% if x.llegada %} required{% endif %}>
+                  </div>
+                  {{ motivo_enmienda('motivo-tramo-' ~ x.id) }}
+                  <div class="col-12 d-flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-primary">Guardar corrección</button>
+                    <button class="btn btn-sm btn-outline-danger" formaction="/viajes/{{ viaje.id }}/tramos/{{ x.id }}/eliminar"
+                            data-confirmar="¿Eliminar este tramo del trayecto?">Eliminar tramo</button>
+                  </div>
+                </form>
+              </td></tr>
+            {% endif %}
+          {% else %}
+            <tr><td colspan="7" class="text-secondary">Todavía no hay tramos registrados.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if puede_editar %}
+      <button class="btn btn-sm btn-outline-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#agregar-tramo"
+              aria-expanded="false" aria-controls="agregar-tramo"><i class="ti ti-plus" aria-hidden="true"></i> Agregar tramo con sus horas</button>
+      <div class="collapse mb-4" id="agregar-tramo">
+        <form method="post" action="/viajes/{{ viaje.id }}/tramos/nuevo" class="card card-body row g-2 align-items-end flex-row mx-0">
+          {{ csrf_input }}
+          <p class="small text-secondary mb-1">Para transcribir un tramo que no se registró con los botones.</p>
+          {% if not t.tramos %}
+            <div class="col-md-6">
+              <label class="form-label small mb-1" for="nuevo-origen">Salió de</label>
+              {{ selector_punto('origen', 'nuevo-origen', ubicaciones, '', viaje.buque, vacio='Elige…') }}
+            </div>
+          {% endif %}
+          <div class="col-md-6">
+            <label class="form-label small mb-1" for="nuevo-salida">Salida</label>
+            <input class="form-control" type="datetime-local" id="nuevo-salida" name="salida" required>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small mb-1" for="nuevo-destino">Llegó a</label>
+            {{ selector_punto('destino', 'nuevo-destino', ubicaciones, '', viaje.buque, vacio='Elige…') }}
+          </div>
+          <div class="col-md-6">
+            <label class="form-label small mb-1" for="nuevo-llegada">Llegada</label>
+            <input class="form-control" type="datetime-local" id="nuevo-llegada" name="llegada" required>
+          </div>
+          {{ motivo_enmienda('motivo-tramo-nuevo') }}
+          <div class="col-12"><button class="btn btn-sm btn-primary">Agregar tramo</button></div>
+        </form>
+      </div>
+    {% endif %}
+
+    <h2 class="h5">Esperas <span class="text-secondary fw-normal fs-6">· total {{ viaje.espera_total|duracion }}</span></h2>
+    <div class="table-responsive mb-2">
+      <table class="table tabla align-middle">
+        <thead><tr><th>Inicio</th><th>Fin</th><th>Duración</th><th>Motivo</th>{% if puede_editar %}<th></th>{% endif %}</tr></thead>
+        <tbody>
+          {% for e in t.esperas %}
+            <tr>
+              <td class="cifra">{{ e.inicio|hora(viaje.fecha) }}</td>
+              <td class="cifra">{{ e.fin|hora(viaje.fecha) }}{% if not e.fin %} <span class="badge text-bg-info">en curso</span>{% endif %}</td>
+              <td class="cifra small">{{ e.duracion|duracion }}</td>
+              <td class="small">{{ e.motivo or '—' }}</td>
+              {% if puede_editar %}
+                <td class="text-end"><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#corregir-espera-{{ e.id }}" aria-expanded="false" aria-controls="corregir-espera-{{ e.id }}">Corregir</button></td>
+              {% endif %}
+            </tr>
+            {% if puede_editar %}
+              <tr class="collapse fila-correccion" id="corregir-espera-{{ e.id }}"><td colspan="5">
+                <form method="post" action="/viajes/{{ viaje.id }}/esperas/{{ e.id }}" class="row g-2 align-items-end">
+                  {{ csrf_input }}
+                  <div class="col-md-4">
+                    <label class="form-label small mb-1" for="inicio-{{ e.id }}">Inicio</label>
+                    <input class="form-control" type="datetime-local" id="inicio-{{ e.id }}" name="inicio" value="{{ e.inicio|valor_fechahora }}" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small mb-1" for="fin-{{ e.id }}">Fin</label>
+                    <input class="form-control" type="datetime-local" id="fin-{{ e.id }}" name="fin" value="{{ e.fin|valor_fechahora }}"{% if e.fin %} required{% endif %}>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small mb-1" for="motivo-{{ e.id }}">Motivo</label>
+                    <input class="form-control" id="motivo-{{ e.id }}" name="motivo" maxlength="200" value="{{ e.motivo or '' }}">
+                  </div>
+                  {{ motivo_enmienda('motivo-espera-' ~ e.id) }}
+                  <div class="col-12 d-flex flex-wrap gap-2">
+                    <button class="btn btn-sm btn-primary">Guardar corrección</button>
+                    <button class="btn btn-sm btn-outline-danger" formaction="/viajes/{{ viaje.id }}/esperas/{{ e.id }}/eliminar"
+                            data-confirmar="¿Eliminar esta espera?">Eliminar espera</button>
+                  </div>
+                </form>
+              </td></tr>
+            {% endif %}
+          {% else %}
+            <tr><td colspan="5" class="text-secondary">Sin esperas.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if puede_editar %}
+      <button class="btn btn-sm btn-outline-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#agregar-espera"
+              aria-expanded="false" aria-controls="agregar-espera"><i class="ti ti-plus" aria-hidden="true"></i> Agregar espera con sus horas</button>
+      <div class="collapse mb-4" id="agregar-espera">
+        <form method="post" action="/viajes/{{ viaje.id }}/esperas/nueva" class="card card-body row g-2 align-items-end flex-row mx-0">
+          {{ csrf_input }}
+          <div class="col-md-4">
+            <label class="form-label small mb-1" for="nueva-inicio">Inicio</label>
+            <input class="form-control" type="datetime-local" id="nueva-inicio" name="inicio" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1" for="nueva-fin">Fin</label>
+            <input class="form-control" type="datetime-local" id="nueva-fin" name="fin" required>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-1" for="nueva-motivo">Motivo</label>
+            <input class="form-control" id="nueva-motivo" name="motivo" maxlength="200">
+          </div>
+          {{ motivo_enmienda('motivo-espera-nueva') }}
+          <div class="col-12"><button class="btn btn-sm btn-primary">Agregar espera</button></div>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if enmiendas %}
+  <h2 class="h5 mt-2">Enmiendas</h2>
+  <div class="card card-body mb-4">
+    {% for g in enmiendas %}
+      <div class="{{ '' if loop.last else 'mb-3 pb-3 border-bottom' }}">
+        <div class="fw-semibold">{{ g.fecha|fechahora }} · {{ g.autor or 'Sistema' }}</div>
+        <div class="small text-secondary mb-1">Motivo: {{ g.motivo }}</div>
+        <ul class="small mb-0">{% for c in g.cambios %}<li>{{ c }}</li>{% endfor %}</ul>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
+{% if supervisor and viaje.estado in ('BORRADOR', 'EN_CURSO') %}
+  <details class="mb-4">
+    <summary class="text-secondary small">Cancelar este reporte</summary>
+    <form method="post" action="/viajes/{{ viaje.id }}/cancelar" class="row g-2 align-items-end mt-1" style="max-width: 40rem"
+          data-confirmar="¿Cancelar el reporte {{ viaje.codigo }}? No se puede deshacer.">
+      {{ csrf_input }}
+      <div class="col-sm-8">
+        <label class="form-label small mb-1" for="motivo-cancelacion">Motivo <span class="text-danger">*</span></label>
+        <input class="form-control" id="motivo-cancelacion" name="motivo_cancelacion" required maxlength="300">
+      </div>
+      <div class="col-sm-4"><button class="btn btn-outline-danger w-100">Cancelar reporte</button></div>
+    </form>
+  </details>
+{% endif %}
+{% endblock %}

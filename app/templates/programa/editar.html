@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area, casilla %}
+{% block titulo %}Editar tarea{% endblock %}
+{% block contenido %}
+<h1>Editar tarea</h1>
+<p class="text-secondary">{{ tarea.actividad }} · {{ tarea.unidad }}
+  {% if tarea.horometro_actual is not none %}· horómetro actual {{ tarea.horometro_actual|num }} h{% endif %}</p>
+<form method="post" class="card card-body" style="max-width: 40rem">
+  {{ csrf_input }}
+  <div class="alert alert-light border small">
+    El último servicio se actualiza solo cuando el supervisor de mantenimiento aprueba la ODS preventiva.
+    Edítalo a mano únicamente para corregir datos de arranque.
+  </div>
+  <div class="row">
+    <div class="col-sm-6">{{ campo('intervalo_horas', 'Cada cuántas horas', tarea, tipo='number', attrs='step="1" min="1"') }}</div>
+    <div class="col-sm-6">{{ campo('horometro_ultimo_servicio', 'Horómetro del último servicio', tarea, tipo='number', attrs='step="0.1" min="0"') }}</div>
+  </div>
+  <div class="row">
+    <div class="col-sm-6">{{ campo('intervalo_dias', 'Cada cuántos días', tarea, tipo='number', attrs='step="1" min="1"') }}</div>
+    <div class="col-sm-6">{{ campo('fecha_ultimo_servicio', 'Fecha del último servicio', tarea, tipo='date') }}</div>
+  </div>
+  {{ area('notas', 'Notas', tarea, filas=2) }}
+  {{ casilla('activa', 'Tarea activa', tarea.activa) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="/programa?equipo_id={{ tarea.equipo_id }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

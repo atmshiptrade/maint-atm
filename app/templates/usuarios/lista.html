@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block titulo %}Usuarios{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0"><i class="ti ti-users" aria-hidden="true"></i> Usuarios</h1>
+  <a class="btn btn-primary" href="/usuarios/nuevo"><i class="ti ti-plus" aria-hidden="true"></i> Nuevo usuario</a>
+</div>
+<div class="table-responsive">
+  <table class="table table-hover tabla">
+    <thead><tr><th>Nombre</th><th>Usuario</th>{% for modulo, (nombre, _) in MODULOS.items() %}<th>{{ nombre }}</th>{% endfor %}<th>Estado</th><th>Creado</th><th></th></tr></thead>
+    <tbody>
+      {% for u in usuarios %}
+        <tr class="{{ '' if u.activo else 'text-secondary' }}">
+          <td>{{ u.nombre }}</td>
+          <td><code>{{ u.usuario }}</code></td>
+          {% for modulo in MODULOS %}
+            <td>{% if u.es_admin %}<span class="badge tono-marino">Administrador</span>{% else %}{{ ROLES[u.roles[modulo]] if modulo in u.roles else '—' }}{% endif %}</td>
+          {% endfor %}
+          <td>{% if u.activo %}<span class="badge text-bg-success">Activo</span>{% else %}<span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+          <td class="small">{{ u.creado_en|fechahora }}</td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/usuarios/{{ u.id }}/editar">Editar</a></td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div class="card card-body small text-secondary">
+  <strong class="text-body">Qué puede hacer cada rol</strong>
+  <ul class="mb-0">
+    <li><strong>Mantenimiento · Mecánico:</strong> registra y corrige sus bitácoras, toma ODS y reporta el servicio realizado (con fotos).</li>
+    <li><strong>Mantenimiento · Supervisor de Mantenimiento:</strong> además maquinaria, programa y los catálogos de Mantenimiento en Data; asigna, aprueba, devuelve y cancela ODS, incluidas las que reporta él mismo.</li>
+    <li><strong>Operaciones · Patrón:</strong> registra el trayecto (zarpes, llegadas y esperas) de los viajes que tiene asignados.</li>
+    <li><strong>Operaciones · Supervisor de Operaciones:</strong> crea, asigna, cierra y enmienda los reportes de viaje, y administra los catálogos de Operaciones en Data.</li>
+    <li><strong>Administrador:</strong> todo lo anterior en todos los módulos, más Usuarios y Configuración.</li>
+    <li>Quien tiene rol en un solo módulo no ve los demás.</li>
+  </ul>
+</div>
+{% endblock %}

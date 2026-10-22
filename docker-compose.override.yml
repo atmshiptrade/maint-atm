@@ -1,0 +1,14 @@
+# Solo desarrollo (docker compose lo carga automáticamente):
+# código montado con recarga automática y la app en http://localhost:8002
+# (copia piloto: el proyecto original ocupa el 8000)
+services:
+  app:
+    command: >
+      sh -c "python -m app.migrate &&
+             exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app"
+    volumes:
+      - ./app:/srv/app
+      - ./db/migrations:/srv/db/migrations:ro
+      - ./db/demo:/srv/db/demo:ro
+    ports:
+      - "127.0.0.1:8002:8000"

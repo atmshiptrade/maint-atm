@@ -1,0 +1,33 @@
+{# Checklist de inspección: todo viene en OK y solo se toca lo que falla.
+   valores: lo ya marcado (item_<id>, comentario_<id>)
+   ot_por_item: {item_id: ods} para avisar fallas que ya tienen ODS pendiente
+   bloqueados: {item_id: ods} fallas que ya generaron su ODS (no se pueden quitar) #}
+{% macro checklist(grupos, valores, ot_por_item={}, bloqueados={}) %}
+  {% for categoria, items in grupos %}
+    <div class="checklist-categoria">{{ categoria }}</div>
+    {% for item in items %}
+      {% set actual = valores.get('item_%s'|format(item.id), 'OK') %}
+      {% set ods_bloqueo = bloqueados.get(item.id) %}
+      <div class="item">
+        <div class="item-nombre">
+          {{ item.nombre }}
+          {% if ods_bloqueo %}
+            <a class="badge text-bg-secondary text-decoration-none" href="/ordenes/{{ ods_bloqueo }}" target="_blank">
+              <i class="ti ti-lock" aria-hidden="true"></i> Generó la ODS #{{ ods_bloqueo }}</a>
+          {% elif ot_por_item.get(item.id) %}
+            <a class="badge text-bg-warning text-decoration-none" href="/ordenes/{{ ot_por_item[item.id] }}" target="_blank">ODS #{{ ot_por_item[item.id] }} pendiente</a>
+          {% endif %}
+        </div>
+        <div class="btn-group" role="group" aria-label="{{ item.nombre }}">
+          {% for valor, texto, color in [('OK', 'OK', 'success'), ('FALLA', 'Falla', 'danger'), ('NA', 'N/A', 'secondary')] %}
+            <input type="radio" class="btn-check" name="item_{{ item.id }}" id="i{{ item.id }}-{{ valor }}" value="{{ valor }}"
+                   autocomplete="off"{% if actual == valor %} checked{% endif %}{% if ods_bloqueo %} disabled data-bloqueado="1"{% endif %}>
+            <label class="btn btn-outline-{{ color }}" for="i{{ item.id }}-{{ valor }}">{{ texto }}</label>
+          {% endfor %}
+        </div>
+        <input class="form-control comentario" name="comentario_{{ item.id }}" maxlength="500"
+               placeholder="Describe la falla (obligatorio)" value="{{ valores.get('comentario_%s'|format(item.id), '') or '' }}">
+      </div>
+    {% endfor %}
+  {% endfor %}
+{% endmacro %}

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}Bitácora{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0"><i class="ti ti-notebook" aria-hidden="true"></i> Bitácora</h1>
+  {% if tiene_rol(usuario, 'MECANICO', 'SUPERVISOR') %}
+    <a class="btn btn-primary" href="/bitacora/nueva{{ '?lancha_id=%s'|format(filtros.lancha_id) if filtros.lancha_id else '' }}"><i class="ti ti-plus" aria-hidden="true"></i> Registrar bitácora</a>
+  {% endif %}
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-12 col-sm-6 col-lg-3">
+    <label class="form-label small mb-1" for="filtro-lancha">Lancha</label>
+    <select class="form-select" id="filtro-lancha" name="lancha_id">
+      <option value="">Todas</option>
+      {% for l in lanchas %}<option value="{{ l.id }}"{% if l.id == filtros.lancha_id %} selected{% endif %}>{{ l.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-sm-3 col-lg-2">
+    <label class="form-label small mb-1" for="filtro-desde">Desde</label>
+    <input class="form-control" type="date" id="filtro-desde" name="desde" value="{{ filtros.desde or '' }}">
+  </div>
+  <div class="col-6 col-sm-3 col-lg-2">
+    <label class="form-label small mb-1" for="filtro-hasta">Hasta</label>
+    <input class="form-control" type="date" id="filtro-hasta" name="hasta" value="{{ filtros.hasta or '' }}">
+  </div>
+  <div class="col-6 col-lg-2">
+    <div class="form-check form-switch mb-2">
+      <input class="form-check-input" type="checkbox" role="switch" id="filtro-fallas" name="fallas" value="1"{% if filtros.fallas %} checked{% endif %}>
+      <label class="form-check-label" for="filtro-fallas">Solo con fallas</label>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3 d-flex gap-2">
+    <button class="btn btn-secondary">Filtrar</button>
+    <a class="btn btn-outline-secondary" href="/bitacora">Limpiar</a>
+  </div>
+</form>
+
+<div class="table-responsive">
+  <table class="table table-hover tabla">
+    <thead><tr><th>#</th><th>Fecha</th><th>Lancha</th><th>Horómetros</th><th>Inspección</th><th>Observación</th><th>Registró</th></tr></thead>
+    <tbody>
+      {% for b in bitacoras %}
+        <tr>
+          <td><a href="/bitacora/{{ b.id }}" class="fw-semibold">#{{ b.id }}</a></td>
+          <td class="cifra">{{ b.fecha|fecha }}</td>
+          <td>{{ b.lancha or '—' }}{% if b.origen == 'OT' %} <span class="badge text-bg-light border">desde ODS</span>{% endif %}</td>
+          <td class="cifra small">{{ b.lecturas or '—' }}</td>
+          <td>{% if b.origen == 'OT' %}—{% elif b.fallas %}<span class="badge text-bg-danger">{{ b.fallas }} falla(s)</span>{% else %}<span class="badge text-bg-success">Sin fallas</span>{% endif %}</td>
+          <td class="small">{{ b.observacion or '' }}</td>
+          <td class="small">{{ b.registrado_por or '—' }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="text-secondary">No hay registros con esos filtros.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

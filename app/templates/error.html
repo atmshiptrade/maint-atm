@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block titulo %}Error {{ codigo }}{% endblock %}
+{% block contenido %}
+<div class="text-center py-5">
+  <div class="display-4 text-secondary">{{ codigo }}</div>
+  <p class="lead">{{ detalle }}</p>
+  <a class="btn btn-primary" href="/">Ir al inicio</a>
+</div>
+{% endblock %}

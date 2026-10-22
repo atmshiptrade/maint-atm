@@ -1,0 +1,412 @@
+{% macro badge_tarea(estado) -%}
+  {%- set estilos = {
+      'AL DIA': ('text-bg-success', 'Al día'),
+      'PROXIMA': ('text-bg-warning', 'Próxima'),
+      'VENCIDA': ('text-bg-naranja', 'Vencida'),
+      'FUERA DE TOLERANCIA': ('text-bg-danger', 'Fuera de tolerancia'),
+      'INACTIVA': ('text-bg-secondary', 'Inactiva')} -%}
+  {%- set clase, texto = estilos.get(estado, ('text-bg-light', estado)) -%}
+  <span class="badge {{ clase }}">{{ texto }}</span>
+{%- endmacro %}
+
+{% macro badge_ot(estado) -%}
+  {%- set estilos = {
+      'ABIERTA': ('text-bg-primary', 'Abierta'),
+      'EN_PROCESO': ('text-bg-info', 'En proceso'),
+      'EJECUTADA': ('text-bg-warning', 'Por aprobar'),
+      'CERRADA': ('text-bg-success', 'Cerrada'),
+      'CANCELADA': ('text-bg-secondary', 'Cancelada')} -%}
+  {%- set clase, texto = estilos.get(estado, ('text-bg-light', estado)) -%}
+  <span class="badge {{ clase }}">{{ texto }}</span>
+{%- endmacro %}
+
+{% macro badge_prioridad(prioridad) -%}
+  {%- set estilos = {
+      'CRITICA': ('text-bg-danger', 'Crítica'),
+      'ALTA': ('text-bg-naranja', 'Alta'),
+      'MEDIA': ('text-bg-light border', 'Media'),
+      'BAJA': ('text-bg-light border text-secondary', 'Baja')} -%}
+  {%- set clase, texto = estilos.get(prioridad, ('text-bg-light', prioridad)) -%}
+  <span class="badge {{ clase }}">{{ texto }}</span>
+{%- endmacro %}
+
+{% macro badge_tipo(tipo) -%}
+  <span class="badge {{ 'text-bg-dark' if tipo == 'PREVENTIVO' else 'text-bg-danger-subtle text-danger-emphasis' }}">
+    {{- 'Preventivo' if tipo == 'PREVENTIVO' else 'Correctivo' -}}
+  </span>
+{%- endmacro %}
+
+{% macro etiqueta(texto, requerido=false, para='') -%}
+  <label class="form-label"{% if para %} for="{{ para }}"{% endif %}>{{ texto }}{% if requerido %} <span class="text-danger">*</span>{% endif %}</label>
+{%- endmacro %}
+
+{# Campo de formulario simple. valores: dict con lo ya escrito (para re-mostrar tras un error) #}
+{% macro campo(nombre, texto, valores, tipo='text', requerido=false, ayuda='', attrs='') -%}
+  {%- set valor = valores.get(nombre) if valores else none -%}
+  <div class="mb-3">
+    {{ etiqueta(texto, requerido, 'f-' ~ nombre) }}
+    <input class="form-control" id="f-{{ nombre }}" name="{{ nombre }}" type="{{ tipo }}"
+           value="{{ '' if valor is none else valor }}"{% if requerido %} required{% endif %} {{ attrs|safe }}>
+    {% if ayuda %}<div class="form-text">{{ ayuda }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro area(nombre, texto, valores, requerido=false, filas=3, ayuda='') -%}
+  {%- set valor = valores.get(nombre) if valores else none -%}
+  <div class="mb-3">
+    {{ etiqueta(texto, requerido, 'f-' ~ nombre) }}
+    <textarea class="form-control" id="f-{{ nombre }}" name="{{ nombre }}" rows="{{ filas }}"
+              {% if requerido %}required{% endif %}>{{ '' if valor is none else valor }}</textarea>
+    {% if ayuda %}<div class="form-text">{{ ayuda }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{# opciones: lista de (valor, texto) #}
+{% macro selector(nombre, texto, opciones, valor, requerido=false, vacio=none, attrs='') -%}
+  <div class="mb-3">
+    {{ etiqueta(texto, requerido, 'f-' ~ nombre) }}
+    <select class="form-select" id="f-{{ nombre }}" name="{{ nombre }}"{% if requerido %} required{% endif %} {{ attrs|safe }}>
+      {% if vacio is not none %}<option value="">{{ vacio }}</option>{% endif %}
+      {% for v, t in opciones %}
+        <option value="{{ v }}"{% if valor is not none and v|string == valor|string %} selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+{%- endmacro %}
+
+{% macro casilla(nombre, texto, marcado) -%}
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="f-{{ nombre }}" name="{{ nombre }}"{% if marcado %} checked{% endif %}>
+    <label class="form-check-label" for="f-{{ nombre }}">{{ texto }}</label>
+  </div>
+{%- endmacro %}
+
+{% macro horas_restantes(tarea) -%}
+  {%- if tarea.horas_restantes is not none -%}
+    {%- if tarea.horas_restantes < 0 -%}
+      <span class="text-danger fw-semibold">{{ (-tarea.horas_restantes)|num }} h pasada</span>
+    {%- else -%}
+      {{ tarea.horas_restantes|num }} h
+    {%- endif -%}
+  {%- endif -%}
+  {%- if tarea.dias_restantes is not none -%}
+    {% if tarea.horas_restantes is not none %}<br>{% endif %}
+    {%- if tarea.dias_restantes < 0 -%}
+      <span class="text-danger fw-semibold">{{ -tarea.dias_restantes }} días pasada</span>
+    {%- else -%}
+      {{ tarea.dias_restantes }} días
+    {%- endif -%}
+  {%- endif -%}
+{%- endmacro %}
+
+{# Selector de categoría con botón "Nueva" (crea la categoría sin salir del formulario).
+   Debe ir acompañado de modal_categoria() fuera del <form>. #}
+{% macro selector_categoria(categorias, valor) -%}
+  <div class="mb-3">
+    <label class="form-label" for="f-categoria_id">Categoría <span class="text-danger">*</span></label>
+    <div class="input-group">
+      <select class="form-select" id="f-categoria_id" name="categoria_id" required>
+        <option value="">Elige…</option>
+        {% for c in categorias %}
+          <option value="{{ c.id }}"{% if c.id|string == valor|string %} selected{% endif %}>{{ c.nombre }}{% if not c.activa %} (inactiva){% endif %}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-categoria">
+        <i class="ti ti-plus" aria-hidden="true"></i> Nueva
+      </button>
+    </div>
+    <div class="form-text"><a href="/data/categorias" target="_blank" rel="noopener">Editar categorías existentes</a></div>
+  </div>
+{%- endmacro %}
+
+{% macro modal_categoria() -%}
+  <div class="modal fade" id="modal-categoria" tabindex="-1" aria-labelledby="modal-categoria-titulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="modal-categoria-titulo">Nueva categoría</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <label class="form-label" for="nueva-categoria">Nombre</label>
+          <input class="form-control" id="nueva-categoria" maxlength="80" autocomplete="off">
+          <div class="text-danger small mt-2" id="nueva-categoria-error" role="alert"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="guardar-categoria">Agregar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    (() => {
+      const modal = document.getElementById('modal-categoria');
+      const entrada = document.getElementById('nueva-categoria');
+      const aviso = document.getElementById('nueva-categoria-error');
+      modal.addEventListener('shown.bs.modal', () => { entrada.value = ''; aviso.textContent = ''; entrada.focus(); });
+      entrada.addEventListener('input', () => { aviso.textContent = ''; });
+      entrada.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); guardar(); } });
+      document.getElementById('guardar-categoria').addEventListener('click', guardar);
+
+      async function guardar() {
+        const nombre = entrada.value.trim();
+        if (!nombre) { aviso.textContent = 'Escribe el nombre de la categoría.'; return; }
+        const datos = new URLSearchParams({ nombre, csrf: document.querySelector('input[name="csrf"]').value });
+        const respuesta = await fetch('/data/categorias', { method: 'POST', body: datos, headers: { Accept: 'application/json' } });
+        const resultado = await respuesta.json().catch(() => ({ error: 'No se pudo guardar. Intenta de nuevo.' }));
+        if (!respuesta.ok) { aviso.textContent = resultado.error || 'No se pudo guardar.'; return; }
+        const selector = document.getElementById('f-categoria_id');
+        selector.add(new Option(resultado.nombre, resultado.id, true, true));
+        bootstrap.Modal.getOrCreateInstance(modal).hide();
+      }
+    })();
+  </script>
+{%- endmacro %}
+
+{# Selector del módulo Maquinaria. activo: 'lanchas' | 'generadores'; modo: 'lista' (listados) o 'nueva' (crear) #}
+{% macro selector_maquinaria(activo, modo='lista') -%}
+  {%- set opciones = [
+      ('lanchas', 'ship', 'Lanchas' if modo == 'lista' else 'Lancha', '/lanchas' if modo == 'lista' else '/lanchas/nueva'),
+      ('generadores', 'bolt', 'Generadores' if modo == 'lista' else 'Generador', '/generadores' if modo == 'lista' else '/generadores/nuevo')] -%}
+  <div class="btn-group selector-maquinaria" role="group" aria-label="{{ 'Ver' if modo == 'lista' else 'Crear' }} lanchas o generadores">
+    {% for clave, icono, texto, url in opciones %}
+      <a class="btn {{ 'btn-primary' if clave == activo else 'btn-outline-primary' }}" href="{{ url }}"{% if clave == activo %} aria-current="page"{% endif %}>
+        <i class="ti ti-{{ icono }}" aria-hidden="true"></i> {{ texto }}
+      </a>
+    {% endfor %}
+  </div>
+{%- endmacro %}
+
+{# Campos de un catálogo de app/catalogos.py. «prefijo» distingue los id cuando hay varios formularios en la página. #}
+{% macro campos_catalogo(catalogo, valores, sugerencias={}, prefijo='f-') -%}
+  <div class="row gx-3">
+    {% for c in catalogo.campos %}
+      {%- set id = prefijo ~ c.nombre -%}
+      {%- set valor = valores.get(c.nombre) if valores else none -%}
+      <div class="{{ c.ancho }} mb-3">
+        {{ etiqueta(c.etiqueta, c.requerido, id) }}
+        {% if c.tipo == 'area' %}
+          <textarea class="form-control" id="{{ id }}" name="{{ c.nombre }}" rows="2"{% if c.requerido %} required{% endif %}>{{ '' if valor is none else valor }}</textarea>
+        {% elif c.tipo == 'opcion' %}
+          <select class="form-select" id="{{ id }}" name="{{ c.nombre }}"{% if c.requerido %} required{% endif %}>
+            {% if not c.requerido %}<option value="">—</option>{% endif %}
+            {% for v, t in c.opciones %}<option value="{{ v }}"{% if valor is not none and v == valor|string %} selected{% endif %}>{{ t }}</option>{% endfor %}
+          </select>
+        {% else %}
+          <input class="form-control" id="{{ id }}" name="{{ c.nombre }}"
+                 type="{{ {'numero': 'number', 'telefono': 'tel', 'correo': 'email'}.get(c.tipo, 'text') }}"
+                 value="{{ '' if valor is none else valor }}"{% if c.requerido %} required{% endif %}
+                 {%- if c.sugerencias is not none %} list="sugerencias-{{ c.nombre }}"{% endif %} {{ c.attrs|safe }}>
+        {% endif %}
+        {% if c.ayuda %}<div class="form-text">{{ c.ayuda }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  </div>
+  {% for nombre, lista in sugerencias.items() %}
+    <datalist id="sugerencias-{{ nombre }}">{% for v in lista %}<option value="{{ v }}">{% endfor %}</datalist>
+  {% endfor %}
+{%- endmacro %}
+
+{# Valor de un campo de catálogo para mostrar en una tabla #}
+{% macro texto_campo(c, valor) -%}
+  {%- if valor is none or valor == '' -%}—
+  {%- elif c.tipo == 'opcion' -%}{{ dict(c.opciones).get(valor, valor) }}
+  {%- elif c.tipo == 'numero' -%}{{ valor|num }}
+  {%- else -%}{{ valor }}{%- endif -%}
+{%- endmacro %}
+
+{# ---------------------------------------------------------------------
+   Operaciones
+   --------------------------------------------------------------------- #}
+{% macro badge_viaje(estado) -%}
+  {%- set estilos = {
+      'BORRADOR': ('text-bg-light border', 'Borrador'),
+      'EN_CURSO': ('text-bg-info', 'En curso'),
+      'FINALIZADO': ('text-bg-warning', 'Por cerrar'),
+      'CERRADO': ('text-bg-success', 'Cerrado'),
+      'CANCELADO': ('text-bg-secondary', 'Cancelado')} -%}
+  {%- set clase, texto = estilos.get(estado, ('text-bg-light', estado)) -%}
+  <span class="badge {{ clase }}">{{ texto }}</span>
+{%- endmacro %}
+
+{% macro badge_disponibilidad(disponibilidad) -%}
+  {%- set estilos = {
+      'DISPONIBLE': ('text-bg-success', 'Disponible'),
+      'EN_SERVICIO': ('text-bg-info', 'En servicio'),
+      'INACTIVA': ('text-bg-secondary', 'Inactiva')} -%}
+  {%- set clase, texto = estilos.get(disponibilidad, ('text-bg-light', disponibilidad)) -%}
+  <span class="badge {{ clase }}">{{ texto }}</span>
+{%- endmacro %}
+
+{# Punto del trayecto: muelles, áreas o «a bordo del buque». Valor: U<id> o BUQUE. #}
+{% macro selector_punto(nombre, id, ubicaciones, valor, buque, vacio=none, requerido=true) -%}
+  <select class="form-select" id="{{ id }}" name="{{ nombre }}"{% if requerido %} required{% endif %}>
+    {% if vacio is not none %}<option value="">{{ vacio }}</option>{% endif %}
+    {% for tipo, titulo in [('MUELLE', 'Muelles'), ('AREA', 'Áreas')] %}
+      {% set grupo = ubicaciones|selectattr('tipo', 'equalto', tipo)|list %}
+      {% if grupo %}
+        <optgroup label="{{ titulo }}">
+          {% for u in grupo %}<option value="U{{ u.id }}"{% if valor == 'U' ~ u.id %} selected{% endif %}>{{ u.nombre }}</option>{% endfor %}
+        </optgroup>
+      {% endif %}
+    {% endfor %}
+    {% if buque %}<option value="BUQUE"{% if valor == 'BUQUE' %} selected{% endif %}>A bordo del {{ buque }}</option>{% endif %}
+  </select>
+{%- endmacro %}
+
+{# Alta al vuelo de un catálogo (app/catalogos.py) desde otro formulario: agrega la opción al selector #}
+{% macro modal_catalogo(catalogo, selector_id, sugerencias={}) -%}
+  <div class="modal fade" id="modal-{{ catalogo.clave }}" tabindex="-1" aria-labelledby="modal-{{ catalogo.clave }}-titulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <form class="modal-content form-al-vuelo" data-clave="{{ catalogo.clave }}" data-selector="{{ selector_id }}">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="modal-{{ catalogo.clave }}-titulo">{{ catalogo.nuevo }}</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          {{ campos_catalogo(catalogo, {}, sugerencias, 'm-' ~ catalogo.clave ~ '-') }}
+          <div class="text-danger small" role="alert" data-error></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button class="btn btn-primary">Agregar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+{%- endmacro %}
+
+{# ---------------------------------------------------------------------
+   Listas que se arman fila por fila (materiales de una actividad o una ODS, motivos de
+   inoperatividad). Cada lista: [data-filas] con las filas en [data-lista], la fila vacía en
+   <template> y el botón [data-agregar]. Necesitan script_filas() en el bloque de scripts.
+   --------------------------------------------------------------------- #}
+{% macro fila_material(opciones, fila=none) -%}
+  {%- set elegido = (fila.material_id|string) if fila else '' -%}
+  {%- set unidad = opciones|selectattr('id', 'equalto', elegido|int)|map(attribute='unidad')|first if fila else none -%}
+  <div class="fila-lista">
+    <select class="form-select" name="material_id" aria-label="Material">
+      <option value="">Elige el material…</option>
+      {% for tipo, titulo in [('REPUESTO', 'Repuestos'), ('HERRAMIENTA', 'Herramientas'), ('INSUMO', 'Insumos')] %}
+        {% set grupo = opciones|selectattr('tipo', 'equalto', tipo)|list %}
+        {% if grupo %}
+          <optgroup label="{{ titulo }}" data-tipo="{{ tipo }}">
+            {% for m in grupo %}<option value="{{ m.id }}" data-unidad="{{ m.unidad or '' }}"{% if m.id|string == elegido %} selected{% endif %}>{{ m.nombre }}{% if m.codigo %} · {{ m.codigo }}{% endif %}</option>{% endfor %}
+          </optgroup>
+        {% endif %}
+      {% endfor %}
+    </select>
+    <div class="input-group">
+      <input class="form-control" name="material_cantidad" type="number" step="any" min="0" inputmode="decimal"
+             value="{{ fila.cantidad|cantidad if fila else '' }}" placeholder="Cantidad" aria-label="Cantidad">
+      <span class="input-group-text" data-unidad>{{ unidad or 'cant.' }}</span>
+    </div>
+    <button type="button" class="btn btn-outline-danger" data-quitar aria-label="Quitar material"><i class="ti ti-x" aria-hidden="true"></i></button>
+  </div>
+{%- endmacro %}
+
+{# Lista de herramientas y repuestos. nuevo: botón para registrar uno en Data sin salir (con modal_catalogo fuera del form). #}
+{% macro lista_materiales(opciones, filas, titulo, ayuda='', nuevo=false) -%}
+  <div class="mb-3" data-filas="materiales">
+    <span class="form-label d-block">{{ titulo }}</span>
+    <div class="d-grid gap-2" data-lista>
+      {% for fila in filas %}{{ fila_material(opciones, fila) }}{% endfor %}
+    </div>
+    <template>{{ fila_material(opciones) }}</template>
+    <div class="d-flex flex-wrap align-items-center gap-2{% if filas %} mt-2{% endif %}">
+      <button type="button" class="btn btn-outline-primary" data-agregar><i class="ti ti-plus" aria-hidden="true"></i> Agregar material</button>
+      {% if nuevo %}
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-materiales">
+          <i class="ti ti-tools" aria-hidden="true"></i> Registrar uno nuevo</button>
+      {% endif %}
+    </div>
+    {% if ayuda %}<div class="form-text">{{ ayuda }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro fila_demora(motivos, fila=none) -%}
+  {%- set elegido = (fila.motivo_id|string) if fila else '' -%}
+  <div class="fila-lista">
+    <select class="form-select" name="demora_motivo" aria-label="Motivo">
+      <option value="">Elige el motivo…</option>
+      {% for m in motivos %}<option value="{{ m.id }}"{% if m.id|string == elegido %} selected{% endif %}>{{ m.nombre }}</option>{% endfor %}
+    </select>
+    <div class="input-group">
+      <input class="form-control" name="demora_horas" type="number" step="any" min="0" inputmode="decimal"
+             value="{{ fila.horas|cantidad if fila else '' }}" placeholder="Horas" aria-label="Horas">
+      <span class="input-group-text">h</span>
+    </div>
+    <button type="button" class="btn btn-outline-danger" data-quitar aria-label="Quitar motivo"><i class="ti ti-x" aria-hidden="true"></i></button>
+  </div>
+{%- endmacro %}
+
+{% macro script_filas() -%}
+<script>
+  // Listas fila por fila: «Agregar» copia la fila vacía del <template> y la X la quita.
+  // En la de materiales, la unidad de medida sigue al material elegido.
+  document.querySelectorAll('[data-filas]').forEach(bloque => {
+    const lista = bloque.querySelector('[data-lista]');
+    const plantilla = bloque.querySelector('template');
+    bloque.querySelector('[data-agregar]').addEventListener('click', () => {
+      lista.append(plantilla.content.cloneNode(true));
+      const fila = lista.lastElementChild;
+      bloque.dispatchEvent(new CustomEvent('fila-agregada', { detail: fila }));
+      fila.querySelector('select').focus();
+    });
+    lista.addEventListener('click', evento => {
+      const boton = evento.target.closest('[data-quitar]');
+      if (!boton) return;
+      boton.closest('.fila-lista').remove();
+      bloque.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    lista.addEventListener('change', evento => {
+      const unidad = evento.target.closest('.fila-lista')?.querySelector('[data-unidad]');
+      if (unidad && evento.target.tagName === 'SELECT') {
+        unidad.textContent = evento.target.selectedOptions[0]?.dataset.unidad || 'cant.';
+      }
+    });
+  });
+
+  // Registrar un material nuevo sin salir (supervisor): queda en Data, en todas las filas
+  // y elegido en la primera fila vacía (o en una nueva)
+  const formMaterial = document.querySelector('.form-al-vuelo[data-clave="materiales"]');
+  const bloqueMateriales = document.querySelector('[data-filas="materiales"]');
+  if (formMaterial && bloqueMateriales) {
+    const aviso = formMaterial.querySelector('[data-error]');
+    const titulos = { REPUESTO: 'Repuestos', HERRAMIENTA: 'Herramientas', INSUMO: 'Insumos' };
+    formMaterial.addEventListener('submit', async evento => {
+      evento.preventDefault();
+      aviso.textContent = '';
+      const datos = new FormData(formMaterial);
+      datos.append('csrf', document.querySelector('input[name="csrf"]').value);
+      const respuesta = await fetch('/data/materiales', { method: 'POST', body: datos, headers: { Accept: 'application/json' } });
+      const material = await respuesta.json().catch(() => ({ error: 'No se pudo guardar. Intenta de nuevo.' }));
+      if (!respuesta.ok) { aviso.textContent = material.error || 'No se pudo guardar.'; return; }
+      const selectores = [...bloqueMateriales.querySelectorAll('[data-lista] select'),
+                          bloqueMateriales.querySelector('template').content.querySelector('select')];
+      selectores.forEach(selector => {
+        let grupo = [...selector.querySelectorAll('optgroup')].find(g => g.dataset.tipo === material.tipo);
+        if (!grupo) {
+          grupo = document.createElement('optgroup');
+          grupo.label = titulos[material.tipo] || material.tipo;
+          grupo.dataset.tipo = material.tipo;
+          selector.append(grupo);
+        }
+        const opcion = new Option(material.nombre + (material.codigo ? ` · ${material.codigo}` : ''), material.id);
+        opcion.dataset.unidad = material.unidad || '';
+        grupo.append(opcion);
+      });
+      let selector = [...bloqueMateriales.querySelectorAll('[data-lista] select')].find(s => !s.value);
+      if (!selector) {
+        bloqueMateriales.querySelector('[data-agregar]').click();
+        selector = bloqueMateriales.querySelector('[data-lista]').lastElementChild.querySelector('select');
+      }
+      selector.value = material.id;
+      selector.dispatchEvent(new Event('change', { bubbles: true }));
+      formMaterial.reset();
+      bootstrap.Modal.getOrCreateInstance(formMaterial.closest('.modal')).hide();
+    });
+  }
+</script>
+{%- endmacro %}

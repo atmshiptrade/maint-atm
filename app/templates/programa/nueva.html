@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area %}
+{% block titulo %}Programar tarea{% endblock %}
+
+{% macro unidad(u, icono) %}
+  {% set marcado = (u.id|string) in valores.get('equipo_id', []) %}
+  <div class="row g-2 align-items-center mb-2">
+    <div class="col-sm-6">
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" name="equipo_id" value="{{ u.id }}" id="unidad-{{ u.id }}"{% if marcado %} checked{% endif %}>
+        <label class="form-check-label" for="unidad-{{ u.id }}">
+          <i class="ti ti-{{ icono }} text-secondary" aria-hidden="true"></i> {{ u.nombre }}
+          <span class="text-secondary small">· actual {{ u.horometro_actual|num }} h</span>
+        </label>
+      </div>
+    </div>
+    <div class="col-sm-6">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text">Último servicio</span>
+        <input class="form-control" type="number" step="0.1" min="0" max="{{ u.horometro_actual }}" inputmode="decimal"
+               name="ultimo_{{ u.id }}" value="{{ valores.get('ultimo_%s'|format(u.id), u.horometro_actual) }}"
+               aria-label="Horómetro del último servicio de {{ u.nombre }}">
+        <span class="input-group-text">h</span>
+      </div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% block contenido %}
+<h1><i class="ti ti-calendar-event" aria-hidden="true"></i> Programar tarea</h1>
+<form method="post" class="card card-body" style="max-width: 52rem">
+  {{ csrf_input }}
+  <div class="mb-3">
+    <label class="form-label" for="f-actividad">Actividad <span class="text-danger">*</span></label>
+    <select class="form-select" id="f-actividad" name="actividad_id" required>
+      <option value="">Elige la actividad…</option>
+      {% for a in actividades %}
+        <option value="{{ a.id }}" data-horas="{{ a.intervalo_horas_sugerido|int if a.intervalo_horas_sugerido else '' }}"
+                data-dias="{{ a.intervalo_dias_sugerido or '' }}"
+                {% if a.id|string == valores.get('actividad_id')|string %}selected{% endif %}>{{ a.nombre }}</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="row">
+    <div class="col-sm-6">{{ campo('intervalo_horas', 'Cada cuántas horas de uso', valores, tipo='number', attrs='step="1" min="1" inputmode="numeric"') }}</div>
+    <div class="col-sm-6">{{ campo('intervalo_dias', 'Cada cuántos días', valores, tipo='number', attrs='step="1" min="1" inputmode="numeric"') }}</div>
+  </div>
+  <div class="form-text mt-n2 mb-3">Si llenas ambos, la tarea vence con lo que ocurra primero.</div>
+
+  <fieldset class="border rounded p-3 mb-3">
+    <legend class="fs-6 w-auto px-1 mb-1">¿A qué se aplica?</legend>
+    <p class="small text-secondary mb-3">Se crea una tarea por cada lancha o generador que marques, cada una con su propio
+      horómetro. Así programas de una vez la misma actividad (por ejemplo, el cambio de aceite) en varias unidades.</p>
+
+    <div class="checklist-categoria mb-2 rounded">Lanchas</div>
+    {% for u in unidades.lanchas %}{{ unidad(u, 'ship') }}{% else %}<p class="text-secondary small">No hay lanchas activas.</p>{% endfor %}
+
+    <div class="checklist-categoria mt-3 mb-2 rounded">Generadores</div>
+    {% for u in unidades.generadores %}{{ unidad(u, 'bolt') }}{% else %}<p class="text-secondary small">No hay generadores activos.</p>{% endfor %}
+
+    <div class="form-text">El horómetro del último servicio solo se usa en tareas por horas.</div>
+  </fieldset>
+
+  {{ campo('fecha_ultimo_servicio', 'Fecha del último servicio (para tareas por días)', valores, tipo='date') }}
+  {{ area('notas', 'Notas', valores, filas=2) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Programar</button>
+    <a class="btn btn-outline-secondary" href="/programa">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Precarga el intervalo sugerido de la actividad (sin pisar lo que el usuario ya escribió)
+  const actividad = document.getElementById('f-actividad');
+  actividad?.addEventListener('change', () => {
+    const opcion = actividad.selectedOptions[0];
+    for (const [campo, dato] of [['f-intervalo_horas', 'horas'], ['f-intervalo_dias', 'dias']]) {
+      const input = document.getElementById(campo);
+      if (input && (!input.value || input.dataset.precargado)) {
+        input.value = opcion.dataset[dato] || '';
+        input.dataset.precargado = '1';
+      }
+    }
+  });
+  document.querySelectorAll('#f-intervalo_horas, #f-intervalo_dias').forEach(
+    input => input.addEventListener('input', () => delete input.dataset.precargado));
+</script>
+{% endblock %}

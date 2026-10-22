@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% from "macros.html" import campos_catalogo, texto_campo %}
+{% block titulo %}{{ catalogo.titulo }}{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Data</a></nav>
+<h1><i class="ti ti-{{ catalogo.icono }}" aria-hidden="true"></i> {{ catalogo.titulo }}</h1>
+<p class="text-secondary">{{ catalogo.descripcion }} Lo que ya se usó no se elimina: se desactiva.</p>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="table-responsive">
+      <table class="table table-hover tabla">
+        <thead><tr>
+          {% for c in catalogo.campos if c.en_lista %}<th>{{ c.etiqueta }}</th>{% endfor %}
+          <th>{{ catalogo.uso_titulo }}</th><th></th>
+        </tr></thead>
+        <tbody>
+          {% for r in registros %}
+            <tr class="{{ '' if r.activo_ else 'text-secondary' }}">
+              {% for c in catalogo.campos if c.en_lista %}
+                <td class="{{ 'fw-semibold' if loop.first else 'small' }}">{{ texto_campo(c, r[c.nombre]) }}
+                  {%- if loop.first and not r.activo_ %} <span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+              {% endfor %}
+              <td>{{ r.usos }}</td>
+              <td class="text-end text-nowrap">
+                <a class="btn btn-sm btn-outline-secondary" href="/data/{{ catalogo.clave }}/{{ r.id }}/editar"><i class="ti ti-pencil" aria-hidden="true"></i> Editar</a>
+                {% if not r.usos %}
+                  <form method="post" action="/data/{{ catalogo.clave }}/{{ r.id }}/eliminar" class="d-inline"
+                        data-confirmar="¿Eliminar «{{ r.nombre }}»?">
+                    {{ csrf_input }}
+                    <button class="btn btn-sm btn-outline-danger" aria-label="Eliminar {{ r.nombre }}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="{{ (catalogo.campos|selectattr('en_lista')|list|length) + 2 }}" class="text-secondary">Todavía no hay registros.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card">
+      <div class="card-header">{{ catalogo.nuevo }}</div>
+      <div class="card-body">
+        <form method="post" action="/data/{{ catalogo.clave }}">
+          {{ csrf_input }}
+          {{ campos_catalogo(catalogo, nuevo, sugerencias) }}
+          <button class="btn btn-primary"><i class="ti ti-plus" aria-hidden="true"></i> Registrar</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_tarea, badge_ot, badge_prioridad, badge_tipo, horas_restantes %}
+{% block titulo %}Inicio{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+  <div>
+    <h1 class="mb-1">Hola, {{ usuario.nombre.split(' ')[0] }}</h1>
+    <div class="text-secondary">{{ fecha_larga }}</div>
+  </div>
+  {% if tiene_rol(usuario, 'MECANICO', 'SUPERVISOR') %}
+    <a class="btn btn-primary" href="/bitacora/nueva"><i class="ti ti-plus" aria-hidden="true"></i> Registrar bitácora</a>
+  {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+  {% set indicadores = [
+      ('Fuera de tolerancia', conteo_tareas.get('FUERA DE TOLERANCIA', 0), 'alert-triangle', 'rojo', '/programa?estado=FUERA+DE+TOLERANCIA'),
+      ('Tareas vencidas', conteo_tareas.get('VENCIDA', 0), 'clock-hour-4', 'naranja', '/programa?estado=VENCIDA'),
+      ('Tareas próximas', conteo_tareas.get('PROXIMA', 0), 'calendar-time', 'amarillo', '/programa?estado=PROXIMA'),
+      ('ODS abiertas', conteo_ot.get('ABIERTA', 0), 'clipboard-list', 'marino', '/ordenes?vista=ABIERTA'),
+      ('ODS en proceso', conteo_ot.get('EN_PROCESO', 0), 'tool', 'turquesa', '/ordenes?vista=EN_PROCESO'),
+      ('ODS por aprobar', conteo_ot.get('EJECUTADA', 0), 'circle-check', 'verde', '/ordenes?vista=EJECUTADA')] %}
+  {% for texto, valor, icono, tono, url in indicadores %}
+    <div class="col-6 col-md-4 col-xxl-2">
+      <a class="card indicador{% if not valor %} vacio{% endif %}" href="{{ url }}">
+        <span class="indicador-icono tono-{{ tono }}"><i class="ti ti-{{ icono }}" aria-hidden="true"></i></span>
+        <span>
+          <span class="indicador-numero d-block">{{ valor }}</span>
+          <span class="indicador-texto d-block">{{ texto }}</span>
+        </span>
+      </a>
+    </div>
+  {% endfor %}
+</div>
+
+{% if sin_bitacora %}
+<div class="card mb-4 border-warning-subtle">
+  <div class="card-body d-flex flex-wrap align-items-center gap-2">
+    <span class="indicador-icono tono-amarillo me-1"><i class="ti ti-notebook" aria-hidden="true"></i></span>
+    <strong class="me-2">Lanchas sin bitácora hoy:</strong>
+    {% for l in sin_bitacora %}
+      {% if tiene_rol(usuario, 'MECANICO', 'SUPERVISOR') %}
+        <a class="btn btn-sm btn-outline-primary" href="/bitacora/nueva?lancha_id={{ l.id }}"><i class="ti ti-ship" aria-hidden="true"></i> {{ l.nombre }}</a>
+      {% else %}<span class="badge text-bg-light border">{{ l.nombre }}</span>{% endif %}
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if mis_ordenes %}
+<h2 class="h5 mb-2">Mis órdenes de servicio</h2>
+<div class="list-group mb-4">
+  {% for o in mis_ordenes %}
+    <a class="list-group-item list-group-item-action d-flex flex-wrap gap-2 align-items-center py-3" href="/ordenes/{{ o.id }}">
+      <strong>#{{ o.id }}</strong> {{ badge_ot(o.estado) }} {{ badge_prioridad(o.prioridad) }}
+      <span>{{ o.lancha }} — {{ o.descripcion }}</span>
+    </a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<h2 class="h5 mb-2">Tareas que requieren atención</h2>
+{% if alertas %}
+<div class="table-responsive">
+  <table class="table table-hover tabla">
+    <thead><tr><th>Lancha / generador</th><th>Actividad</th><th>Faltan</th><th>Fecha estimada</th><th>Estado</th><th>ODS</th></tr></thead>
+    <tbody>
+      {% for t in alertas %}
+        <tr>
+          <td><a href="/programa?equipo_id={{ t.equipo_id }}" class="fw-semibold"><i class="ti ti-{{ 'bolt' if t.tipo_equipo == 'GENERADOR' else 'ship' }}" aria-hidden="true"></i> {{ t.unidad }}</a></td>
+          <td>{{ t.actividad }}</td>
+          <td class="cifra">{{ horas_restantes(t) }}</td>
+          <td class="cifra">{{ t.fecha_estimada|fecha }}</td>
+          <td>{{ badge_tarea(t.estado) }}</td>
+          <td>{% if t.ot_pendiente %}<a href="/ordenes/{{ t.ot_pendiente }}">#{{ t.ot_pendiente }}</a>{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card card-body text-secondary"><span><i class="ti ti-circle-check text-success" aria-hidden="true"></i> Todo el programa está al día.</span></div>
+{% endif %}
+
+{# ---------------- Fallas y tiempos ---------------- #}
+{% set a = analisis %}
+{% set titulo_unidad = unidad_elegida.nombre if unidad_elegida else {'L': 'Todas las lanchas', 'G': 'Todos los generadores'}.get(filtro.unidad, 'Toda la flota') %}
+<section class="mt-5" id="analisis" aria-labelledby="titulo-analisis">
+  <h2 class="h5 mb-1" id="titulo-analisis"><i class="ti ti-chart-bar" aria-hidden="true"></i> Fallas y tiempos de mantenimiento</h2>
+  <p class="small text-secondary mb-2">{{ titulo_unidad }} · del {{ filtro.desde|fecha }} al {{ filtro.hasta|fecha }}</p>
+
+  <form method="get" action="/#analisis" class="card card-body mb-3">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-5">
+        <label class="form-label small mb-1" for="analisis-unidad">Lancha o generador</label>
+        <select class="form-select" id="analisis-unidad" name="unidad">
+          {% for clave, texto in [('', 'Toda la flota'), ('L', 'Todas las lanchas'), ('G', 'Todos los generadores')] %}
+            <option value="{{ clave }}"{% if filtro.unidad == clave %} selected{% endif %}>{{ texto }}</option>
+          {% endfor %}
+          {% for tipo, titulo in [('LANCHA', 'Lanchas'), ('GENERADOR', 'Generadores')] %}
+            {% set grupo = unidades|selectattr('tipo', 'equalto', tipo)|list %}
+            {% if grupo %}
+              <optgroup label="{{ titulo }}">
+                {% for u in grupo %}<option value="{{ u.clave }}"{% if filtro.unidad == u.clave %} selected{% endif %}>{{ u.nombre }}{% if not u.activa %} (inactiva){% endif %}</option>{% endfor %}
+              </optgroup>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md">
+        <label class="form-label small mb-1" for="analisis-desde">Desde</label>
+        <input class="form-control" type="date" id="analisis-desde" name="desde" value="{{ filtro.desde }}">
+      </div>
+      <div class="col-6 col-md">
+        <label class="form-label small mb-1" for="analisis-hasta">Hasta</label>
+        <input class="form-control" type="date" id="analisis-hasta" name="hasta" value="{{ filtro.hasta }}">
+      </div>
+      <div class="col-12 col-md-auto">
+        <button class="btn btn-secondary w-100"><i class="ti ti-search" aria-hidden="true"></i> Ver</button>
+      </div>
+    </div>
+    <div class="d-flex flex-wrap align-items-center gap-2 small mt-2">
+      <span class="text-secondary">Atajos:</span>
+      {% for texto, desde, hasta in atajos %}
+        {% set activo = filtro.desde == desde and filtro.hasta == hasta %}
+        <a class="badge rounded-pill text-decoration-none {{ 'text-bg-primary' if activo else 'text-bg-light border' }}"
+           href="/?{{ consulta(desde=desde, hasta=hasta) }}#analisis"{% if activo %} aria-current="true"{% endif %}>{{ texto }}</a>
+      {% endfor %}
+    </div>
+  </form>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card indicador">
+        <span class="indicador-icono tono-rojo"><i class="ti ti-alert-octagon" aria-hidden="true"></i></span>
+        <span>
+          <span class="indicador-numero d-block">{{ a.totales.fallas }}</span>
+          <span class="indicador-texto d-block">Fallas (ODS correctivas){% if a.totales.preventivas %} · y {{ a.totales.preventivas }} preventiva(s){% endif %}</span>
+        </span>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card indicador">
+        <span class="indicador-icono tono-naranja"><i class="ti ti-repeat" aria-hidden="true"></i></span>
+        <span>
+          {% if a.mas_recurrente %}
+            <span class="indicador-numero d-block">{{ a.mas_recurrente.veces }} {{ 'vez' if a.mas_recurrente.veces == 1 else 'veces' }}</span>
+            <span class="indicador-texto d-block">Falla más recurrente: <strong>{{ a.mas_recurrente.falla }}</strong></span>
+          {% else %}
+            <span class="indicador-numero d-block">—</span>
+            <span class="indicador-texto d-block">Falla más recurrente: {{ 'ninguna se ha repetido' if a.totales.fallas else 'sin fallas' }}</span>
+          {% endif %}
+        </span>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card indicador">
+        <span class="indicador-icono tono-amarillo"><i class="ti ti-player-pause" aria-hidden="true"></i></span>
+        <span>
+          <span class="indicador-numero d-block">{{ a.horas_fuera|horas }}</span>
+          <span class="indicador-texto d-block">Fuera de servicio
+            {%- if a.disponibilidad is not none %} · disponibilidad {{ '%.1f'|format(a.disponibilidad) }} %{% if not unidad_elegida %} (promedio){% endif %}{% endif %}</span>
+        </span>
+      </div>
+    </div>
+    <div class="col-12 col-sm-6 col-xl-3">
+      <div class="card indicador">
+        <span class="indicador-icono tono-marino"><i class="ti ti-tool" aria-hidden="true"></i></span>
+        <span>
+          <span class="indicador-numero d-block">{{ (a.totales.trabajo or 0)|horas }}</span>
+          <span class="indicador-texto d-block">Trabajo de reparación
+            {%- if a.totales.con_trabajo %} · promedio {{ (a.totales.trabajo / a.totales.con_trabajo)|horas }} por ODS{% endif %}
+            {%- if a.totales.horas_hombre %} · {{ a.totales.horas_hombre|num }} horas-hombre{% endif %}</span>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-xl-7">
+      <div class="card h-100">
+        <div class="card-header">Fallas más recurrentes</div>
+        {% if a.fallas %}
+        <div class="table-responsive">
+          <table class="table tabla mb-0">
+            <thead><tr><th>Qué falló</th><th>Veces</th><th>{{ 'Dónde' if not unidad_elegida else 'Categoría' }}</th><th>Última</th><th>Fuera de servicio</th></tr></thead>
+            <tbody>
+              {% for f in a.fallas %}
+                <tr{% if f.item_id is none %} class="text-secondary"{% endif %}>
+                  <td class="fw-semibold">{{ f.falla }}{% if f.categoria and not unidad_elegida %}<div class="small fw-normal text-secondary">{{ f.categoria }}</div>{% endif %}</td>
+                  <td class="cifra">
+                    <div class="d-flex align-items-center gap-2">
+                      <span class="fw-semibold">{{ f.veces }}</span>
+                      <span class="barra barra-tabla" aria-hidden="true"><span class="barra-valor" style="width: {{ (f.veces / a.max_veces * 100)|round(1) }}%"></span></span>
+                    </div>
+                  </td>
+                  <td class="small">{{ f.unidades if not unidad_elegida else (f.categoria or '—') }}</td>
+                  <td class="cifra">{{ f.ultima|fecha }}</td>
+                  <td class="cifra">{{ f.horas_fuera|horas if f.horas_fuera else '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if a.fallas_ocultas %}<div class="card-body py-2 small text-secondary">Y {{ a.fallas_ocultas }} falla(s) más con menos repeticiones.</div>{% endif %}
+        {% if a.totales.sin_clasificar %}
+          <div class="card-body py-2 small text-secondary border-top">«Sin clasificar»: ODS correctivas manuales en las que no se indicó qué falló. Se indica al crearlas o al reportarlas.</div>
+        {% endif %}
+        {% else %}
+          <div class="card-body text-secondary"><i class="ti ti-circle-check text-success" aria-hidden="true"></i> Sin fallas en este período.</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="col-xl-5">
+      <div class="card h-100">
+        <div class="card-header">¿En qué se fue el tiempo fuera de servicio?</div>
+        <div class="card-body">
+          {% if a.segmentos %}
+            <p class="small text-secondary">{{ a.reparto.fuera|horas }} en las ODS ya reportadas que dejaron la maquinaria parada.</p>
+            {% for texto, horas, es_trabajo, porcentaje in a.segmentos %}
+              <div class="mb-3">
+                <div class="d-flex justify-content-between gap-2 small">
+                  <span{% if es_trabajo %} class="fw-semibold"{% endif %}>{{ texto }}</span>
+                  <span class="cifra text-secondary">{{ horas|horas }} · {{ '%.0f'|format(porcentaje) }} %</span>
+                </div>
+                <div class="barra" aria-hidden="true"><span class="barra-valor{% if not es_trabajo %} barra-externa{% endif %}" style="width: {{ porcentaje|round(1) }}%"></span></div>
+              </div>
+            {% endfor %}
+            <p class="small text-secondary mb-0">El trabajo es lo que duró la reparación; el resto son factores externos (repuestos, horario, proveedor…), según los motivos indicados en cada ODS.</p>
+          {% else %}
+            <p class="text-secondary mb-0">Todavía no hay ODS reportadas con tiempo fuera de servicio en este período.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% if unidad_elegida %}
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+      <h3 class="h5 mb-0">Historial de {{ unidad_elegida.nombre }}</h3>
+      <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-sm btn-outline-secondary" href="/{{ 'lanchas' if unidad_elegida.tipo == 'LANCHA' else 'generadores' }}/{{ unidad_elegida.id }}">
+          <i class="ti ti-{{ 'ship' if unidad_elegida.tipo == 'LANCHA' else 'bolt' }}" aria-hidden="true"></i> Ver {{ 'la lancha' if unidad_elegida.tipo == 'LANCHA' else 'el generador' }}</a>
+        <a class="btn btn-sm btn-outline-secondary" href="/ordenes?vista=todas&amp;{{ 'lancha_id' if unidad_elegida.tipo == 'LANCHA' else 'equipo_id' }}={{ unidad_elegida.id }}&amp;fecha=apertura&amp;desde={{ filtro.desde }}&amp;hasta={{ filtro.hasta }}">
+          <i class="ti ti-tool" aria-hidden="true"></i> En Órdenes de servicio</a>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover tabla">
+        <thead><tr><th>Fecha</th><th>ODS</th><th>Qué pasó</th><th>Estado</th><th>Fuera de servicio</th><th>Trabajo</th></tr></thead>
+        <tbody>
+          {% for o in a.historial %}
+            <tr>
+              <td class="cifra">{{ o.fecha|fecha }}</td>
+              <td><a href="/ordenes/{{ o.id }}" class="fw-semibold">#{{ o.id }}</a><div>{{ badge_tipo(o.tipo) }}</div></td>
+              <td>{% if o.item or o.actividad %}<strong>{{ o.item or o.actividad }}</strong>{% endif %}
+                <div class="small text-secondary">{{ o.descripcion }}</div></td>
+              <td>{{ badge_ot(o.estado) }}</td>
+              <td class="cifra">
+                {% if o.sigue_fuera %}<span class="badge text-bg-warning">Sigue fuera · {{ o.horas_fuera|horas }}</span>
+                {% elif o.fuera_servicio %}{{ o.horas_fuera|horas }}
+                {% elif o.fuera_servicio is sameas false %}<span class="text-secondary">No</span>
+                {% else %}—{% endif %}
+              </td>
+              <td class="cifra">{{ o.horas_reparacion|horas(2) if o.horas_reparacion else '—' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="text-secondary">Sin órdenes de servicio en este período.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if a.historial_recortado %}<p class="small text-secondary">Se muestran las {{ a.historial|length }} más recientes: acorta el período para ver las anteriores.</p>{% endif %}
+  {% else %}
+    <h3 class="h5 mb-2">Por lancha y generador</h3>
+    <div class="table-responsive">
+      <table class="table table-hover tabla">
+        <thead><tr><th>Lancha / generador</th><th>Fallas</th><th>La que más se repite</th><th>Fuera de servicio</th><th>Disponibilidad</th><th>Trabajo</th></tr></thead>
+        <tbody>
+          {% for u in a.por_unidad %}
+            <tr>
+              <td><a class="fw-semibold" href="/?{{ consulta(unidad=u.clave) }}#analisis"><i class="ti ti-{{ 'ship' if u.tipo == 'LANCHA' else 'bolt' }}" aria-hidden="true"></i> {{ u.nombre }}</a></td>
+              <td class="cifra">{{ u.fallas }}</td>
+              <td>{% if u.falla %}{{ u.falla }} <span class="small text-secondary">({{ u.veces }})</span>{% else %}—{% endif %}</td>
+              <td class="cifra">{{ u.horas_fuera|horas if u.horas_fuera else '—' }}</td>
+              <td class="cifra">{{ '%.1f'|format(u.disponibilidad) ~ ' %' if u.disponibilidad is not none else '—' }}</td>
+              <td class="cifra">{{ u.trabajo|horas if u.trabajo else '—' }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="text-secondary">No hay maquinaria registrada.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  <p class="small text-secondary">Las fallas son las ODS correctivas no canceladas, por el día en que se detectaron. Si dos fallas de la misma
+    maquinaria se solapan, ese tiempo fuera de servicio cuenta una sola vez; una que sigue abierta cuenta hasta ahora.</p>
+</section>
+{% endblock %}

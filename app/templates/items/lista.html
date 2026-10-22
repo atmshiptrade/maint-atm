@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_prioridad %}
+{% block titulo %}Ítems de inspección{% endblock %}
+{% block contenido %}
+<h1><i class="ti ti-checklist" aria-hidden="true"></i> Ítems de inspección de la bitácora</h1>
+<p class="text-secondary">Estas son las preguntas del formulario de bitácora. Agregar un ítem no cambia la base de datos:
+  aparece de inmediato en el formulario. Los ítems del generador solo se preguntan cuando la lancha lleva uno a bordo. Un ítem que ya no se usa se desactiva (el historial se conserva).</p>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="table-responsive">
+      <table class="table table-hover tabla">
+        <thead><tr><th>Orden</th><th>Ítem</th><th>Se revisa en</th><th>Categoría</th><th>Prioridad de la ODS</th><th></th></tr></thead>
+        <tbody>
+          {% for i in items %}
+            <tr class="{{ '' if i.activo else 'text-secondary' }}">
+              <td>{{ i.orden }}</td>
+              <td>{{ i.nombre }}{% if not i.activo %} <span class="badge text-bg-secondary">Inactivo</span>{% endif %}</td>
+              <td><i class="ti ti-{{ 'bolt' if i.aplica_a == 'GENERADOR' else 'ship' }} text-secondary" aria-hidden="true"></i> {{ 'Generador' if i.aplica_a == 'GENERADOR' else 'Lancha' }}</td>
+              <td>{{ i.categoria }}</td>
+              <td>{{ badge_prioridad(i.prioridad) }}</td>
+              <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="/data/items/{{ i.id }}/editar">Editar</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-xl-4">
+    <div class="card">
+      <div class="card-header fw-semibold">Agregar ítem</div>
+      <div class="card-body">
+        {% include "items/_campos.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

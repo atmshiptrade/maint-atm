@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% from "macros.html" import campos_catalogo %}
+{% block titulo %}Editar · {{ catalogo.titulo }}{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data/{{ catalogo.clave }}" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> {{ catalogo.titulo }}</a></nav>
+<h1><i class="ti ti-{{ catalogo.icono }}" aria-hidden="true"></i> {{ registro.nombre }}</h1>
+<form method="post" class="card card-body" style="max-width: 40rem">
+  {{ csrf_input }}
+  {{ campos_catalogo(catalogo, registro, sugerencias) }}
+  <div class="form-check form-switch mb-3">
+    <input class="form-check-input" type="checkbox" role="switch" id="f-activo_" name="activo_"{% if registro.activo_ %} checked{% endif %}>
+    <label class="form-check-label" for="f-activo_">Activo (aparece en las listas para elegir)</label>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="/data/{{ catalogo.clave }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_prioridad %}
+{% block titulo %}Actividades{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Data</a></nav>
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+  <h1 class="mb-0"><i class="ti ti-list-check" aria-hidden="true"></i> Catálogo de actividades</h1>
+  {% if tiene_rol(usuario, 'SUPERVISOR') %}<a class="btn btn-primary" href="/data/actividades/nueva"><i class="ti ti-plus" aria-hidden="true"></i> Nueva actividad</a>{% endif %}
+</div>
+<p class="text-secondary">Las actividades se definen una vez y luego se programan para cada lancha o generador en el <a href="/programa">programa</a>.</p>
+<div class="table-responsive">
+  <table class="table table-hover tabla">
+    <thead><tr><th>#</th><th>Actividad</th><th>Categoría</th><th>Severidad</th><th>Tolerancia</th><th>Tiempo est.</th><th>Intervalo sugerido</th><th>Materiales</th><th>Programada en</th><th></th></tr></thead>
+    <tbody>
+      {% for a in actividades %}
+        <tr class="{{ '' if a.activa else 'text-secondary' }}">
+          <td>{{ a.id }}</td>
+          <td class="fw-semibold">{{ a.nombre }}{% if not a.activa %} <span class="badge text-bg-secondary">Inactiva</span>{% endif %}
+            {% if a.descripcion %}<div class="small fw-normal text-secondary">{{ a.descripcion }}</div>{% endif %}</td>
+          <td>{{ a.categoria }}</td>
+          <td>{{ badge_prioridad(a.severidad) }}</td>
+          <td class="cifra">±{{ a.tolerancia_pct|num(0) }} %</td>
+          <td class="cifra">{{ (a.tiempo_estimado_h|num(1) ~ ' h') if a.tiempo_estimado_h else '—' }}</td>
+          <td class="cifra">
+            {{ (a.intervalo_horas_sugerido|num(0) ~ ' h') if a.intervalo_horas_sugerido else '' }}
+            {{ ' / ' if a.intervalo_horas_sugerido and a.intervalo_dias_sugerido else '' }}
+            {{ (a.intervalo_dias_sugerido ~ ' días') if a.intervalo_dias_sugerido else '' }}
+            {{ '—' if not a.intervalo_horas_sugerido and not a.intervalo_dias_sugerido else '' }}
+          </td>
+          <td class="small">
+            {% for m in a.lista_materiales or [] %}{{ m.nombre }}{% if m.cantidad %} ({{ m.cantidad|cantidad }}{% if m.unidad %} {{ m.unidad }}{% endif %}){% endif %}{{ ', ' if not loop.last }}{% endfor %}
+            {%- if a.materiales %}{% if a.lista_materiales %}<br>{% endif %}<span class="text-secondary">{{ a.materiales }}</span>{% endif %}
+            {%- if not a.lista_materiales and not a.materiales %}—{% endif %}
+          </td>
+          <td>{{ a.tareas }} tarea(s)</td>
+          <td class="text-end">{% if tiene_rol(usuario, 'SUPERVISOR') %}<a class="btn btn-sm btn-outline-secondary" href="/data/actividades/{{ a.id }}/editar">Editar</a>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="10" class="text-secondary">Todavía no hay actividades.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

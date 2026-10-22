@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block titulo %}Configuración{% endblock %}
+{% block contenido %}
+<h1><i class="ti ti-settings" aria-hidden="true"></i> Configuración</h1>
+<p class="text-secondary">Colores y logos del sistema. Al cambiar un color, esta página lo muestra al instante; al guardar,
+  se aplica para todos los usuarios.</p>
+
+<div class="row g-4">
+  <div class="col-xl-7">
+    <form method="post" action="/configuracion/colores" class="card" id="form-colores">
+      <div class="card-header"><i class="ti ti-palette" aria-hidden="true"></i> Colores</div>
+      <div class="card-body">
+        {{ csrf_input }}
+        {% for clave, variable, nombre, uso, original in colores_def %}
+          <div class="color-fila">
+            <input type="color" class="form-control form-control-color color-selector" value="{{ colores[clave] }}"
+                   data-selector="{{ clave }}" aria-label="Elegir {{ nombre|lower }}">
+            <label class="form-label mb-0 color-nombre" for="color-{{ clave }}">{{ nombre }}</label>
+            <div class="form-text mt-0 color-uso">{{ uso }}</div>
+            <button type="button" class="btn btn-sm btn-link px-1 color-original" data-original="{{ clave }}" title="Usar el color original ({{ original }})"
+                    aria-label="Usar el color original de {{ nombre|lower }}"{% if colores[clave]|upper == original %} hidden{% endif %}>
+              <i class="ti ti-arrow-back-up" aria-hidden="true"></i></button>
+            <input class="form-control font-monospace color-hex" id="color-{{ clave }}" name="color_{{ clave }}"
+                   value="{{ colores[clave] }}" maxlength="7" pattern="#[0-9A-Fa-f]{6}" required autocomplete="off"
+                   data-clave="{{ clave }}" data-guardado="{{ marca.colores[clave] }}" data-valor-original="{{ original }}">
+          </div>
+        {% endfor %}
+
+        <div class="vista-previa mt-3">
+          <div class="small text-secondary mb-2">Así se verán algunos elementos (el menú y esta página también cambian):</div>
+          <div class="d-flex flex-wrap align-items-center gap-2">
+            <button type="button" class="btn btn-primary">Botón principal</button>
+            <button type="button" class="btn btn-outline-primary">Botón secundario</button>
+            <span class="link-primary text-decoration-underline">Enlace</span>
+            <span class="badge text-bg-info">Etiqueta</span>
+            <span class="badge tono-marino">Dato</span>
+            <div class="form-check form-switch mb-0 ms-1">
+              <input class="form-check-input" type="checkbox" role="switch" id="previa-interruptor" checked>
+              <label class="form-check-label" for="previa-interruptor">Activo</label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card-footer d-flex flex-wrap gap-2">
+        <button class="btn btn-primary"><i class="ti ti-device-floppy" aria-hidden="true"></i> Guardar colores</button>
+        <button type="button" class="btn btn-outline-secondary" id="deshacer-colores">Deshacer cambios</button>
+        {% if marca.personalizados %}
+          <button class="btn btn-outline-danger ms-sm-auto" form="form-restaurar-colores"
+                  data-confirmar="¿Volver a los colores originales del sistema?">Restaurar originales</button>
+        {% endif %}
+      </div>
+    </form>
+    <form id="form-restaurar-colores" method="post" action="/configuracion/colores/restaurar">{{ csrf_input }}</form>
+  </div>
+
+  <div class="col-xl-5">
+    {% for clave, (nombre, indicacion, original) in logos_def.items() %}
+      <div class="card mb-4">
+        <div class="card-header"><i class="ti ti-photo" aria-hidden="true"></i> {{ nombre }}</div>
+        <div class="card-body">
+          <div class="logo-muestra{{ ' logo-muestra-menu' if clave == 'logo_menu' }}">
+            <img src="{{ marca.logos[clave] }}" alt="{{ nombre }} actual" id="muestra-{{ clave }}">
+          </div>
+          <p class="form-text">{{ indicacion }}
+            {{ 'Ahora se usa un logo subido.' if clave in marca.logos_propios else 'Ahora se usa el logo original.' }}</p>
+          <form method="post" action="/configuracion/logos/{{ clave }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2">
+            {{ csrf_input }}
+            <input class="form-control flex-grow-1 w-auto" type="file" name="archivo" accept="image/png,image/jpeg,image/webp"
+                   required data-muestra="muestra-{{ clave }}" aria-label="Nueva imagen para el {{ nombre|lower }}">
+            <button class="btn btn-primary"><i class="ti ti-upload" aria-hidden="true"></i> Subir</button>
+          </form>
+          {% if clave in marca.logos_propios %}
+            <form method="post" action="/configuracion/logos/{{ clave }}/restaurar" class="mt-2"
+                  data-confirmar="¿Volver al {{ nombre|lower }} original?">
+              {{ csrf_input }}
+              <button class="btn btn-sm btn-outline-secondary"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Usar el original</button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  // Vista previa en vivo: mismo cálculo de tonos que app/marca.py (_variables)
+  const raiz = document.documentElement;
+  const valido = c => /^#[0-9A-Fa-f]{6}$/.test(c);
+  const rgb = c => [1, 3, 5].map(i => parseInt(c.slice(i, i + 2), 16));
+  const mezclar = (c, con, p) => '#' + rgb(c).map((x, i) =>
+    Math.round(x + (rgb(con)[i] - x) * p).toString(16).padStart(2, '0')).join('').toUpperCase();
+  const campos = [...document.querySelectorAll('.color-hex')];
+  const selector = clave => document.querySelector(`[data-selector="${clave}"]`);
+  const original = clave => document.querySelector(`[data-original="${clave}"]`);
+
+  function aplicar() {
+    const v = {};
+    campos.forEach(c => { v[c.dataset.clave] = valido(c.value) ? c.value : c.dataset.guardado; });
+    const vars = {
+      '--color-principal': v.principal, '--color-menu': v.menu, '--color-acento': v.acento,
+      '--color-secundario': v.secundario, '--color-fondo': v.fondo,
+      '--color-menu-oscuro': mezclar(v.menu, '#000000', .2),
+      '--color-acento-oscuro': mezclar(v.acento, '#000000', .19),
+      '--color-principal-suave': mezclar(v.principal, '#FFFFFF', .9),
+      '--color-principal-borde': mezclar(v.principal, '#FFFFFF', .7),
+      '--color-acento-suave': mezclar(v.acento, '#FFFFFF', .87),
+    };
+    ['--color-principal', '--color-menu', '--color-menu-oscuro', '--color-acento', '--color-acento-oscuro', '--color-secundario']
+      .forEach(n => { vars[n + '-rgb'] = rgb(vars[n]).join(', '); });
+    Object.entries(vars).forEach(([k, valor]) => raiz.style.setProperty(k, valor));
+    campos.forEach(c => { original(c.dataset.clave).hidden = c.value.toUpperCase() === c.dataset.valorOriginal; });
+  }
+
+  function poner(campo, valor) {
+    campo.value = valor.toUpperCase();
+    selector(campo.dataset.clave).value = valor.toLowerCase();
+  }
+
+  campos.forEach(c => {
+    c.addEventListener('input', () => {
+      if (valido(c.value)) selector(c.dataset.clave).value = c.value.toLowerCase();
+      aplicar();
+    });
+    selector(c.dataset.clave).addEventListener('input', e => { c.value = e.target.value.toUpperCase(); aplicar(); });
+    original(c.dataset.clave).addEventListener('click', () => { poner(c, c.dataset.valorOriginal); aplicar(); });
+  });
+  document.getElementById('deshacer-colores').addEventListener('click', () => {
+    campos.forEach(c => poner(c, c.dataset.guardado));
+    aplicar();
+  });
+
+  // Logo: se muestra la imagen elegida antes de subirla
+  document.querySelectorAll('[data-muestra]').forEach(entrada => entrada.addEventListener('change', () => {
+    const archivo = entrada.files[0];
+    if (archivo) document.getElementById(entrada.dataset.muestra).src = URL.createObjectURL(archivo);
+  }));
+  aplicar();
+})();
+</script>
+{% endblock %}

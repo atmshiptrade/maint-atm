@@ -1,0 +1,15 @@
+{% from "macros.html" import campo, selector, casilla, selector_categoria, modal_categoria %}
+<form method="post" action="{{ '/data/items/%s/editar'|format(item.id) if item.id else '/data/items' }}">
+  {{ csrf_input }}
+  {{ campo('nombre', 'Nombre', item, requerido=true) }}
+  {{ selector_categoria(categorias, item.categoria_id) }}
+  {{ selector('aplica_a', 'Se revisa en', [('LANCHA', 'La lancha'), ('GENERADOR', 'El generador a bordo')], item.aplica_a, requerido=true) }}
+  {{ selector('prioridad', 'Prioridad de la ODS que abre una falla', [('CRITICA', 'Crítica'), ('ALTA', 'Alta'), ('MEDIA', 'Media'), ('BAJA', 'Baja')], item.prioridad, requerido=true) }}
+  {{ campo('orden', 'Posición en el formulario', item, tipo='number', ayuda='Opcional: si lo dejas vacío, el ítem va al final de su categoría.', attrs='step="1" min="0"') }}
+  {{ casilla('activo', 'Activo', item.activo) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    {% if item.id %}<a class="btn btn-outline-secondary" href="/data/items">Cancelar</a>{% endif %}
+  </div>
+</form>
+{{ modal_categoria() }}

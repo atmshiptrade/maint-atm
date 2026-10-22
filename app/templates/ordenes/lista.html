@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_ot, badge_prioridad, badge_tipo %}
+{% block titulo %}Órdenes de servicio{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0"><i class="ti ti-tool" aria-hidden="true"></i> Órdenes de servicio</h1>
+  {% if tiene_rol(usuario, 'SUPERVISOR') %}<a class="btn btn-primary" href="/ordenes/nueva"><i class="ti ti-plus" aria-hidden="true"></i> ODS correctiva manual</a>{% endif %}
+</div>
+
+{% set vistas = [('pendientes', 'Pendientes'), ('mias', 'Mis órdenes'), ('ABIERTA', 'Abiertas'), ('EN_PROCESO', 'En proceso'),
+                 ('EJECUTADA', 'Por aprobar'), ('CERRADA', 'Cerradas'), ('CANCELADA', 'Canceladas'), ('todas', 'Todas')] %}
+<ul class="nav nav-pills flex-nowrap overflow-auto mb-3">
+  {% for vista, texto in vistas %}
+    <li class="nav-item">
+      <a class="nav-link text-nowrap{% if filtros.vista == vista %} active{% endif %}"
+         href="?{{ consulta(vista=vista) }}">{{ texto }}</a>
+    </li>
+  {% endfor %}
+</ul>
+
+<form method="get" class="row g-2 mb-2">
+  <input type="hidden" name="vista" value="{{ filtros.vista }}">
+  <div class="col-12 col-sm-4">
+    <select class="form-select" name="lancha_id" onchange="this.form.submit()" aria-label="Lancha">
+      <option value="">Todas las lanchas</option>
+      {% for l in lanchas %}<option value="{{ l.id }}"{% if l.id == filtros.lancha_id %} selected{% endif %}>{{ l.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-sm-4">
+    <select class="form-select" name="equipo_id" onchange="this.form.submit()" aria-label="Generador">
+      <option value="">Todos los generadores</option>
+      {% for g in generadores %}<option value="{{ g.id }}"{% if g.id == filtros.equipo_id %} selected{% endif %}>{{ g.codigo }} · {{ g.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-sm-4">
+    <select class="form-select" name="tipo" onchange="this.form.submit()" aria-label="Tipo">
+      <option value="">Preventivas y correctivas</option>
+      <option value="PREVENTIVO"{% if filtros.tipo == 'PREVENTIVO' %} selected{% endif %}>Solo preventivas</option>
+      <option value="CORRECTIVO"{% if filtros.tipo == 'CORRECTIVO' %} selected{% endif %}>Solo correctivas</option>
+    </select>
+  </div>
+
+  <div class="col-12"></div>
+  <div class="col-12 col-sm-4 col-lg">
+    <label class="form-label small mb-1" for="filtro-fecha">Fecha en que fue</label>
+    <select class="form-select" id="filtro-fecha" name="fecha">
+      {% for clave, (texto, _) in fechas_filtro.items() %}
+        <option value="{{ clave }}"{% if filtros.fecha == clave %} selected{% endif %}>{{ texto }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-sm-4 col-lg">
+    <label class="form-label small mb-1" for="filtro-desde">Desde</label>
+    <input class="form-control" type="date" id="filtro-desde" name="desde" value="{{ filtros.desde or '' }}">
+  </div>
+  <div class="col-6 col-sm-4 col-lg">
+    <label class="form-label small mb-1" for="filtro-hasta">Hasta</label>
+    <input class="form-control" type="date" id="filtro-hasta" name="hasta" value="{{ filtros.hasta or '' }}">
+  </div>
+  <div class="col-12 col-lg-auto d-flex align-items-end gap-2 text-nowrap">
+    <button class="btn btn-secondary"><i class="ti ti-search" aria-hidden="true"></i> Buscar</button>
+    {% if por_fecha %}<a class="btn btn-outline-secondary" href="?{{ consulta(desde=None, hasta=None, fecha=None) }}" title="Quitar el filtro de fechas">Limpiar</a>{% endif %}
+  </div>
+</form>
+
+<div class="d-flex flex-wrap align-items-center gap-2 small mb-3">
+  <span class="text-secondary">Atajos:</span>
+  {% for texto, desde, hasta in periodos %}
+    {% set activo = filtros.desde == desde and filtros.hasta == hasta %}
+    <a class="badge rounded-pill text-decoration-none {{ 'text-bg-primary' if activo else 'text-bg-light border' }}"
+       href="?{{ consulta(desde=desde, hasta=hasta, vista='todas' if filtros.vista == 'pendientes' else filtros.vista) }}">{{ texto }}</a>
+  {% endfor %}
+  {% if por_fecha %}
+    <span class="ms-auto text-secondary">
+      {{ ordenes|length }} orden(es) {{ fechas_filtro[filtros.fecha][0]|lower }}s
+      {% if filtros.desde and filtros.hasta %}del {{ filtros.desde|fecha }} al {{ filtros.hasta|fecha }}
+      {% elif filtros.desde %}desde el {{ filtros.desde|fecha }}{% else %}hasta el {{ filtros.hasta|fecha }}{% endif %}
+      {% if filtros.vista != 'todas' %}· solo «{{ dict(vistas)[filtros.vista] or filtros.vista }}» (<a href="?{{ consulta(vista='todas') }}">ver todas</a>){% endif %}
+    </span>
+  {% endif %}
+</div>
+{% if ordenes|length >= limite %}
+  <div class="alert alert-warning py-2 small">Se muestran solo las {{ limite }} más recientes: acota las fechas para ver el resto.</div>
+{% endif %}
+
+<div class="table-responsive">
+  <table class="table table-hover tabla">
+    <thead><tr><th>ODS</th><th>Lancha / generador</th><th>Descripción</th><th>Estado</th><th class="d-none d-xl-table-cell">Asignada a</th><th class="d-none d-xl-table-cell">Fechas</th></tr></thead>
+    <tbody>
+      {% for o in ordenes %}
+        <tr>
+          <td class="text-nowrap">
+            <a href="/ordenes/{{ o.id }}" class="fw-semibold fs-6">#{{ o.id }}</a>
+            <div class="d-flex flex-wrap gap-1 mt-1">{{ badge_tipo(o.tipo) }} {{ badge_prioridad(o.prioridad) }}</div>
+          </td>
+          <td>{% if o.lancha %}<div>{{ o.lancha }}</div>{% endif %}{% if o.generador %}<div class="{{ 'small text-secondary' if o.lancha else '' }}"><i class="ti ti-bolt" aria-hidden="true"></i> {{ o.generador }}</div>{% endif %}</td>
+          <td style="min-width: 16rem"><a href="/ordenes/{{ o.id }}" class="text-body text-decoration-none">{{ o.descripcion }}</a>
+            <div class="small text-secondary d-xl-none">{{ ('Asignada a ' ~ o.asignado) if o.asignado else 'Sin asignar' }} · abierta {{ o.fecha_apertura|fechahora }}{% if o.fecha_ejecucion %} · realizada {{ o.fecha_ejecucion|fecha }}{% endif %}</div>
+          </td>
+          <td>{{ badge_ot(o.estado) }}</td>
+          <td class="small d-none d-xl-table-cell">{{ o.asignado or '—' }}</td>
+          <td class="cifra small d-none d-xl-table-cell text-nowrap">
+            <div>Abierta {{ o.fecha_apertura|fechahora }}</div>
+            {% if o.fecha_ejecucion %}<div>Realizada {{ o.fecha_ejecucion|fecha }}</div>{% endif %}
+            {% if o.fecha_cierre and o.estado == 'CERRADA' %}<div class="text-secondary">Aprobada {{ o.fecha_cierre|fechahora }}</div>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="text-secondary">
+          No hay órdenes en esta vista{{ ' con esas fechas' if por_fecha }}.
+          {% if por_fecha and filtros.vista != 'todas' %}<a href="?{{ consulta(vista='todas') }}">Buscar en todas las órdenes</a>{% endif %}
+        </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

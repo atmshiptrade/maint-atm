@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "macros.html" import area, selector %}
+{% block titulo %}Nueva ODS correctiva{% endblock %}
+{% block contenido %}
+<h1><i class="ti ti-tool" aria-hidden="true"></i> Nueva ODS correctiva</h1>
+<p class="text-secondary">Para fallas detectadas fuera de la bitácora. Las fallas reportadas en la bitácora abren su ODS solas.</p>
+<form method="post" class="card card-body" style="max-width: 40rem">
+  {{ csrf_input }}
+  <div class="mb-3">
+    <label class="form-label" for="f-unidad">Lancha o generador <span class="text-danger">*</span></label>
+    <select class="form-select" id="f-unidad" name="unidad" required>
+      <option value="">Elige…</option>
+      <optgroup label="Lanchas">
+        {% for l in lanchas %}<option value="L{{ l.id }}"{% if valores.get('unidad') == 'L%s'|format(l.id) %} selected{% endif %}>{{ l.nombre }}</option>{% endfor %}
+      </optgroup>
+      <optgroup label="Generadores">
+        {% for g in generadores %}<option value="G{{ g.id }}"{% if valores.get('unidad') == 'G%s'|format(g.id) %} selected{% endif %}>{{ g.codigo }} · {{ g.nombre }}</option>{% endfor %}
+      </optgroup>
+    </select>
+  </div>
+  {{ selector('prioridad', 'Prioridad', [('CRITICA', 'Crítica'), ('ALTA', 'Alta'), ('MEDIA', 'Media'), ('BAJA', 'Baja')], valores.get('prioridad'), requerido=true) }}
+  {{ area('descripcion', 'Descripción de la falla', valores, requerido=true) }}
+  <div class="mb-3">
+    <label class="form-label" for="f-item">¿Qué falló?</label>
+    <select class="form-select" id="f-item" name="item_id">
+      <option value="">— Otra cosa / se sabrá al revisar —</option>
+      {% for aplica, titulo in [('LANCHA', 'lancha'), ('GENERADOR', 'generador')] %}
+        {% for categoria, items in items_falla|selectattr('aplica_a', 'equalto', aplica)|groupby('categoria') %}
+          <optgroup label="{{ categoria }} ({{ titulo }})" data-aplica="{{ aplica }}">
+            {% for i in items %}<option value="{{ i.id }}"{% if i.id|string == valores.get('item_id')|string %} selected{% endif %}>{{ i.nombre }}</option>{% endfor %}
+          </optgroup>
+        {% endfor %}
+      {% endfor %}
+    </select>
+    <div class="form-text">Opcional: el mecánico también puede indicarlo al reportar. Sirve para saber cuáles son las fallas más recurrentes.</div>
+  </div>
+  <div class="mb-3">
+    <label class="form-label" for="f-asignado">Asignar a</label>
+    <select class="form-select" id="f-asignado" name="asignado_a">
+      <option value="">— Sin asignar (la toma quien esté disponible) —</option>
+      {% for t in tecnicos %}<option value="{{ t.id }}"{% if t.id|string == valores.get('asignado_a')|string %} selected{% endif %}>{{ t.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Crear ODS</button>
+    <a class="btn btn-outline-secondary" href="/ordenes">Cancelar</a>
+  </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // «¿Qué falló?» muestra solo los ítems de la clase de maquinaria elegida (lancha o generador)
+  const unidad = document.getElementById('f-unidad');
+  const item = document.getElementById('f-item');
+  const filtrarItems = () => {
+    const aplica = unidad.value.startsWith('G') ? 'GENERADOR' : unidad.value.startsWith('L') ? 'LANCHA' : '';
+    item.querySelectorAll('optgroup').forEach(grupo => {
+      const visible = !aplica || grupo.dataset.aplica === aplica;
+      grupo.hidden = !visible;
+      grupo.disabled = !visible;
+    });
+    if (item.selectedOptions[0]?.parentElement.disabled) item.value = '';
+  };
+  unidad.addEventListener('change', filtrarItems);
+  filtrarItems();
+</script>
+{% endblock %}

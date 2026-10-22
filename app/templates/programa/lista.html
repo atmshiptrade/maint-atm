@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_tarea, horas_restantes %}
+{% block titulo %}Programa de mantenimiento{% endblock %}
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="mb-0"><i class="ti ti-calendar-event" aria-hidden="true"></i> Programa de mantenimiento</h1>
+  {% if tiene_rol(usuario, 'SUPERVISOR') %}
+    <a class="btn btn-primary" href="/programa/nueva{{ ('?lancha_id=%s'|format(filtros.lancha_id)) if filtros.lancha_id else (('?equipo_id=%s'|format(filtros.equipo_id)) if filtros.equipo_id else '') }}"><i class="ti ti-plus" aria-hidden="true"></i> Programar tarea</a>
+  {% endif %}
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-12 col-sm-6 col-lg-3">
+    <label class="form-label small mb-1" for="filtro-lancha">Lancha</label>
+    <select class="form-select" id="filtro-lancha" name="lancha_id" onchange="this.form.submit()">
+      <option value="">Todas las lanchas</option>
+      {% for l in lanchas %}<option value="{{ l.id }}"{% if l.id == filtros.lancha_id %} selected{% endif %}>{{ l.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-sm-6 col-lg-2">
+    <label class="form-label small mb-1" for="filtro-tipo">Equipo</label>
+    <select class="form-select" id="filtro-tipo" name="tipo" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      <option value="PROPULSION"{% if filtros.tipo == 'PROPULSION' %} selected{% endif %}>Lanchas</option>
+      <option value="GENERADOR"{% if filtros.tipo == 'GENERADOR' %} selected{% endif %}>Generadores</option>
+    </select>
+  </div>
+  <div class="col-6 col-sm-6 col-lg-2">
+    <label class="form-label small mb-1" for="filtro-estado">Estado</label>
+    <select class="form-select" id="filtro-estado" name="estado" onchange="this.form.submit()">
+      <option value="">Todos</option>
+      {% for e, t in [('FUERA DE TOLERANCIA', 'Fuera de tolerancia'), ('VENCIDA', 'Vencida'), ('PROXIMA', 'Próxima'), ('AL DIA', 'Al día'), ('INACTIVA', 'Inactiva')] %}
+        <option value="{{ e }}"{% if e == filtros.estado %} selected{% endif %}>{{ t }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-sm-6 col-lg-3">
+    <label class="form-label small mb-1" for="filtro-categoria">Categoría</label>
+    <select class="form-select" id="filtro-categoria" name="categoria_id" onchange="this.form.submit()">
+      <option value="">Todas</option>
+      {% for c in categorias %}<option value="{{ c.id }}"{% if c.id == filtros.categoria_id %} selected{% endif %}>{{ c.nombre }}</option>{% endfor %}
+    </select>
+  </div>
+  <div class="col-12 col-sm-6 col-lg-2">
+    <div class="form-check form-switch mb-2">
+      <input class="form-check-input" type="checkbox" role="switch" id="filtro-inactivas" name="inactivas" value="1"
+             {% if filtros.inactivas %}checked{% endif %} onchange="this.form.submit()">
+      <label class="form-check-label" for="filtro-inactivas">Incluir inactivas</label>
+    </div>
+  </div>
+  <noscript><div class="col-12"><button class="btn btn-secondary">Filtrar</button></div></noscript>
+</form>
+
+{% for grupo in grupos %}
+  {% set es_generador = grupo.tipo == 'GENERADOR' %}
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <a class="fw-semibold text-decoration-none" href="{{ ('/generadores/%s' if es_generador else '/lanchas/%s')|format(grupo.equipo_id if es_generador else grupo.lancha_id) }}">
+        <i class="ti ti-{{ 'bolt' if es_generador else 'ship' }}" aria-hidden="true"></i> {{ grupo.unidad }}</a>
+      <span class="small text-secondary">{{ grupo.tareas|length }} tarea(s)</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover tabla mb-0">
+        <thead><tr><th>Actividad</th><th class="d-none d-xl-table-cell">Último servicio</th><th>Próximo</th><th class="d-none d-xxl-table-cell">Actual</th><th>Faltan</th><th>Fecha estimada</th><th>Estado</th><th>ODS</th><th></th></tr></thead>
+        <tbody>
+          {% for t in grupo.tareas %}
+            {% set ciclo = [(t.intervalo_horas|num(0) ~ ' h') if t.intervalo_horas else none,
+                            (t.intervalo_dias ~ ' días') if t.intervalo_dias else none]|select|join(' / ') %}
+            <tr>
+              <td style="min-width: 12rem">{{ t.actividad }}<div class="small text-secondary">{{ t.categoria }} · cada {{ ciclo }}</div></td>
+              <td class="cifra d-none d-xl-table-cell">
+                {% if t.horometro_ultimo_servicio is not none %}{{ t.horometro_ultimo_servicio|num }} h{% endif %}
+                {% if t.fecha_ultimo_servicio %}{% if t.horometro_ultimo_servicio is not none %}<br>{% endif %}{{ t.fecha_ultimo_servicio|fecha }}{% endif %}
+              </td>
+              <td class="cifra fw-semibold">
+                {% if t.proximo_horometro is not none %}{{ t.proximo_horometro|num }} h{% endif %}
+                {% if t.proxima_fecha %}{% if t.proximo_horometro is not none %}<br>{% endif %}{{ t.proxima_fecha|fecha }}{% endif %}
+              </td>
+              <td class="cifra d-none d-xxl-table-cell">{{ (t.horometro_actual|num ~ ' h') if t.horometro_actual is not none else '—' }}</td>
+              <td class="cifra">{{ horas_restantes(t) }}</td>
+              <td class="cifra">{{ t.fecha_estimada|fecha }}</td>
+              <td>{{ badge_tarea(t.estado) }}</td>
+              <td>{% if t.ot_pendiente %}<a href="/ordenes/{{ t.ot_pendiente }}">#{{ t.ot_pendiente }}</a>{% else %}—{% endif %}</td>
+              <td class="text-end">{% if tiene_rol(usuario, 'SUPERVISOR') %}<a class="btn btn-sm btn-outline-secondary" href="/programa/{{ t.tarea_id }}/editar">Editar</a>{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+{% else %}
+  <p class="text-secondary">No hay tareas con esos filtros.</p>
+{% endfor %}
+<p class="small text-secondary">La fecha estimada usa el promedio de horas por día de los últimos 30 días de bitácora.</p>
+{% endblock %}

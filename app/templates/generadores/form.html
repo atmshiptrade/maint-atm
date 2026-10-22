@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area, casilla, selector_maquinaria %}
+{% block titulo %}{{ 'Editar' if generador.id else 'Nuevo' }} generador{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="{{ '/generadores/%s'|format(generador.id) if generador.id else '/generadores' }}" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> {{ generador.codigo if generador.id else 'Maquinaria' }}</a></nav>
+{% if generador.id %}
+  <h1><i class="ti ti-bolt" aria-hidden="true"></i> Editar generador {{ generador.codigo }}</h1>
+{% else %}
+  <h1><i class="ti ti-engine" aria-hidden="true"></i> Nueva maquinaria</h1>
+  <div class="mb-3">{{ selector_maquinaria('generadores', 'nueva') }}</div>
+{% endif %}
+<form method="post" class="card card-body" style="max-width: 44rem">
+  {{ csrf_input }}
+  {% if not generador.id %}
+    <p class="text-secondary small">El código (GEN-001, GEN-002…) se asigna automáticamente al guardar.
+      El generador no se asigna a ninguna lancha: en cada bitácora se indica en qué lancha va.</p>
+  {% endif %}
+  <div class="row">
+    <div class="col-sm-6">{{ campo('nombre', 'Nombre', generador, requerido=true, ayuda='Ej. Generador ProMax, Onan 9 kVA') }}</div>
+    <div class="col-sm-6">{{ campo('potencia_kva', 'Potencia (kVA)', generador, tipo='number', attrs='step="0.1" min="0" inputmode="decimal"') }}</div>
+  </div>
+  <div class="row">
+    <div class="col-sm-4">{{ campo('marca', 'Marca', generador) }}</div>
+    <div class="col-sm-4">{{ campo('modelo', 'Modelo', generador) }}</div>
+    <div class="col-sm-4">{{ campo('serie', 'N.º de serie', generador) }}</div>
+  </div>
+  <div class="row">
+    <div class="col-sm-6">{{ campo('horometro_inicial', 'Horómetro actual', generador, tipo='number', requerido=true,
+          ayuda='Solo se puede corregir mientras no tenga lecturas en la bitácora.', attrs='step="0.1" min="0" inputmode="decimal"') }}</div>
+    <div class="col-sm-6">{{ campo('fecha_alta', 'Desde qué fecha se registra', generador, tipo='date', requerido=true) }}</div>
+  </div>
+  {% if generador.id %}{{ casilla('activo', 'Generador activo (desactívalo si se dio de baja)', generador.activo) }}{% endif %}
+  {{ area('notas', 'Notas', generador) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="{{ '/generadores/%s'|format(generador.id) if generador.id else '/generadores' }}">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

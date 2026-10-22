@@ -1,0 +1,675 @@
+{% extends "base.html" %}
+{% from "macros.html" import badge_ot, badge_prioridad, badge_tipo, badge_tarea, lista_materiales, fila_demora, modal_catalogo, script_filas %}
+{% block titulo %}ODS #{{ orden.id }}{% endblock %}
+
+{% macro proximo(t) -%}
+  {{- [(t.proximo_horometro|num ~ ' h') if t.proximo_horometro is not none else none,
+       (t.proxima_fecha|fecha) if t.proxima_fecha else none]|select|join(' / ') -}}
+{%- endmacro %}
+
+{# Lista de materiales para mostrar: «Filtro de aceite — 1 unidad» #}
+{% macro lista_usados(filas) -%}
+  <ul class="mb-0 ps-3">
+    {% for m in filas %}
+      <li>{{ m.nombre }}{% if m.cantidad %} — {{ m.cantidad|cantidad }} {{ m.unidad or '' }}{% endif %}
+        {% if m.tipo == 'HERRAMIENTA' %}<span class="text-secondary small">(herramienta)</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+{%- endmacro %}
+
+{% macro texto_largo(titulo, valor) -%}
+  {% if valor %}
+    <dt class="col-12 mt-2">{{ titulo }}</dt>
+    <dd class="col-12 mb-1" style="white-space: pre-line">{{ valor }}</dd>
+  {% endif %}
+{%- endmacro %}
+
+{% block contenido %}
+<div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+  <div>
+    <h1 class="mb-1"><i class="ti ti-tool" aria-hidden="true"></i> ODS #{{ orden.id }} {{ badge_ot(orden.estado) }}</h1>
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      {{ badge_tipo(orden.tipo) }} {{ badge_prioridad(orden.prioridad) }}
+      {% if orden.lancha_id %}<a href="/lanchas/{{ orden.lancha_id }}"><i class="ti ti-ship" aria-hidden="true"></i> {{ orden.lancha }}</a>{% endif %}
+      {% if orden.generador %}<a href="/generadores/{{ orden.equipo_id }}"><i class="ti ti-bolt" aria-hidden="true"></i> {{ orden.generador }}</a>{% endif %}
+    </div>
+  </div>
+  <a class="btn btn-outline-secondary" href="/ordenes">Volver a órdenes</a>
+</div>
+
+<div class="row g-4">
+  <div class="col-xl-8">
+    <div class="card mb-3">
+      <div class="card-body">
+        <p class="fs-5 mb-2">{{ orden.descripcion }}</p>
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4">Origen</dt>
+          <dd class="col-sm-8">
+            {% if orden.tarea_id %}Programa de mantenimiento: <a href="/programa?equipo_id={{ orden.equipo_id }}">{{ orden.actividad }}</a>
+            {% elif orden.falla_id %}Falla en bitácora <a href="/bitacora/{{ orden.bitacora_id }}">#{{ orden.bitacora_id }}</a> — {{ orden.item }}
+            {% else %}Creada manualmente{% if orden.item %} — {{ orden.item }}{% endif %}{% endif %}
+          </dd>
+          {% if materiales_previstos or orden.materiales_sugeridos %}
+            <dt class="col-sm-4">Materiales previstos</dt>
+            <dd class="col-sm-8">
+              {% if materiales_previstos %}{{ lista_usados(materiales_previstos) }}{% endif %}
+              {% if orden.materiales_sugeridos %}<span class="text-secondary">{{ orden.materiales_sugeridos }}</span>{% endif %}
+            </dd>
+          {% endif %}
+          {% if orden.tiempo_estimado_h %}<dt class="col-sm-4">Tiempo estimado</dt><dd class="col-sm-8">{{ orden.tiempo_estimado_h|num }} h</dd>{% endif %}
+          {% if orden.actividad_descripcion %}<dt class="col-sm-4">Procedimiento</dt><dd class="col-sm-8">{{ orden.actividad_descripcion }}</dd>{% endif %}
+          <dt class="col-sm-4">Abierta</dt><dd class="col-sm-8">{{ orden.fecha_apertura|fechahora }}{% if orden.creado %} por {{ orden.creado }}{% endif %}</dd>
+          <dt class="col-sm-4">Asignada a</dt><dd class="col-sm-8">{{ orden.asignado or '—' }}</dd>
+          {% if orden.fecha_inicio %}<dt class="col-sm-4">Iniciada</dt><dd class="col-sm-8">{{ orden.fecha_inicio|fechahora }}</dd>{% endif %}
+        </dl>
+      </div>
+    </div>
+
+    {# ---------------- Servicio reportado (ya ejecutada o cerrada) ---------------- #}
+    {% if orden.estado in ('EJECUTADA', 'CERRADA') or (orden.estado == 'CANCELADA' and orden.trabajo_realizado) %}
+    <div class="card mb-3 border-success">
+      <div class="card-header">Servicio reportado{% if orden.ejecutado %} por {{ orden.ejecutado }}{% endif %}</div>
+      <div class="card-body">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4">Tipo de servicio</dt>
+          <dd class="col-sm-8">
+            {% if orden.servicio_contratado %}<i class="ti ti-building-store" aria-hidden="true"></i> Contratado · <strong>{{ orden.proveedor }}</strong>
+            {% else %}<i class="ti ti-tool" aria-hidden="true"></i> Mecánicos de la empresa{% endif %}
+          </dd>
+          <dt class="col-sm-4">Programa de mantenimiento</dt>
+          <dd class="col-sm-8">
+            {% if orden.pertenece_programa %}
+              <i class="ti ti-calendar-event" aria-hidden="true"></i> Sí, cumple:
+              <ul class="mb-0 ps-3">
+                {% for t in vinculadas %}
+                  <li>{{ t.actividad }}{% if orden.estado == 'CERRADA' %} <span class="text-secondary">— reprogramada, próximo: {{ proximo(t) }}</span>{% endif %}</li>
+                {% endfor %}
+              </ul>
+              {% if orden.estado == 'EJECUTADA' %}<span class="text-secondary">Al aprobarse, estas tareas se reprograman.</span>{% endif %}
+            {% elif orden.pertenece_programa is sameas false %}No, servicio fuera del programa
+            {% else %}—{% endif %}
+          </dd>
+          {% if orden.tipo == 'CORRECTIVO' %}
+            <dt class="col-sm-4">Qué falló</dt><dd class="col-sm-8">{{ orden.item or 'Sin clasificar' }}</dd>
+          {% endif %}
+          <dt class="col-sm-4">Fecha de ejecución</dt><dd class="col-sm-8">{{ orden.fecha_ejecucion|fecha }}</dd>
+          {% if orden.horometro_ejecucion is not none %}<dt class="col-sm-4">Horómetro</dt><dd class="col-sm-8">{{ orden.horometro_ejecucion|num }} h</dd>{% endif %}
+          {% if orden.fuera_servicio is not none %}
+            <dt class="col-sm-4">Fuera de servicio</dt>
+            <dd class="col-sm-8">
+              {% if orden.fuera_servicio %}<strong>{{ orden.horas_fuera|horas }}</strong>
+                <span class="text-secondary">· del {{ orden.fuera_servicio_desde|fechahora }} al {{ orden.fuera_servicio_hasta|fechahora }}</span>
+              {% else %}No, siguió operando{% endif %}
+            </dd>
+          {% endif %}
+          {% if orden.horas_reparacion %}<dt class="col-sm-4">Duración del trabajo</dt><dd class="col-sm-8">{{ orden.horas_reparacion|horas(2) }}</dd>{% endif %}
+          {% if orden.horas_hombre %}<dt class="col-sm-4">Horas-hombre</dt><dd class="col-sm-8">{{ orden.horas_hombre|num }}</dd>{% endif %}
+          {% if orden.fuera_servicio and orden.horas_reparacion %}
+            {% set externas = [orden.horas_fuera - orden.horas_reparacion, 0]|max %}
+            {% set repartidas = demoras|sum(attribute='horas') %}
+            <dt class="col-sm-4">Factores externos</dt>
+            <dd class="col-sm-8">{{ externas|horas(2) }}
+              {% if demoras or externas - repartidas > 0.01 %}
+                <ul class="mb-0 ps-3">
+                  {% for d in demoras %}<li>{{ d.nombre }} — {{ d.horas|horas(2) }}</li>{% endfor %}
+                  {% if externas - repartidas > 0.01 %}<li class="text-secondary">Sin motivo indicado — {{ (externas - repartidas)|horas(2) }}</li>{% endif %}
+                </ul>
+              {% endif %}
+            </dd>
+          {% endif %}
+          {% if materiales_usados %}
+            <dt class="col-sm-4 mt-2">Materiales usados</dt><dd class="col-sm-8 mt-2">{{ lista_usados(materiales_usados) }}</dd>
+          {% endif %}
+          {{ texto_largo('Diagnóstico antes del trabajo', orden.diagnostico) }}
+          {{ texto_largo('Servicio de mantenimiento requerido', orden.servicio_requerido) }}
+          {{ texto_largo('Servicio de mantenimiento realizado', orden.trabajo_realizado) }}
+          {{ texto_largo('Otros materiales' if materiales_usados else 'Materiales / repuestos usados', orden.materiales_usados) }}
+          {{ texto_largo('Observaciones', orden.observaciones) }}
+          {% if orden.estado == 'CERRADA' %}
+            <dt class="col-sm-4 mt-2">Aprobada</dt>
+            <dd class="col-sm-8 mt-2">{{ orden.fecha_cierre|fechahora }}{% if orden.cerrado %} por {{ orden.cerrado }}{% endif %}
+              {% if orden.cerrado_por and orden.cerrado_por == orden.ejecutado_por %}<span class="badge text-bg-light border">autoaprobada</span>{% endif %}</dd>
+          {% elif orden.estado == 'CANCELADA' %}
+            <dt class="col-sm-4 mt-2">Cancelada</dt><dd class="col-sm-8 mt-2">{{ orden.fecha_cierre|fechahora }}{% if orden.cerrado %} por {{ orden.cerrado }}{% endif %}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ---------------- Acciones según rol y estado ---------------- #}
+    {% if 'tomar' in acciones %}
+      <form method="post" action="/ordenes/{{ orden.id }}/tomar" class="mb-3">{{ csrf_input }}
+        <button class="btn btn-primary btn-lg w-100">Iniciar trabajo</button>
+      </form>
+    {% endif %}
+
+    {% if 'ejecutar' in acciones %}
+    {% set servicio = valores.get('servicio', '' if orden.servicio_contratado is none else ('CONTRATADO' if orden.servicio_contratado else 'PROPIO')) %}
+    <div class="card mb-3 border-primary">
+      <div class="card-header fw-semibold">Reportar servicio realizado</div>
+      <div class="card-body">
+        <p class="small text-secondary">Puedes ir llenándolo durante el trabajo con <strong>Guardar avance</strong> (por ejemplo,
+          el diagnóstico y las fotos de «antes») y reportarlo al terminar.</p>
+        <form method="post" action="/ordenes/{{ orden.id }}/ejecutar" enctype="multipart/form-data" id="form-servicio">
+          {{ csrf_input }}
+
+          <fieldset class="mb-3">
+            <legend class="form-label fs-6 fw-medium">¿Quién hizo el servicio? <span class="text-danger">*</span></legend>
+            <div class="btn-group flex-wrap" role="group">
+              <input type="radio" class="btn-check" name="servicio" id="servicio-propio" value="PROPIO" autocomplete="off"{% if servicio == 'PROPIO' %} checked{% endif %} required>
+              <label class="btn btn-outline-primary" for="servicio-propio"><i class="ti ti-tool" aria-hidden="true"></i> Mecánicos de la empresa</label>
+              <input type="radio" class="btn-check" name="servicio" id="servicio-contratado" value="CONTRATADO" autocomplete="off"{% if servicio == 'CONTRATADO' %} checked{% endif %}>
+              <label class="btn btn-outline-primary" for="servicio-contratado"><i class="ti ti-building-store" aria-hidden="true"></i> Servicio contratado</label>
+            </div>
+          </fieldset>
+
+          <div class="mb-3" id="bloque-proveedor"{% if servicio != 'CONTRATADO' %} hidden{% endif %}>
+            <label class="form-label" for="f-proveedor">Proveedor <span class="text-danger">*</span></label>
+            <div class="input-group">
+              <select class="form-select" id="f-proveedor" name="proveedor_id">
+                <option value="">Elige el proveedor…</option>
+                {% for p in proveedores %}
+                  <option value="{{ p.id }}"{% if p.id|string == valores.get('proveedor_id', orden.proveedor_id)|string %} selected{% endif %}>{{ p.nombre }}</option>
+                {% endfor %}
+              </select>
+              {% if tiene_rol(usuario, 'SUPERVISOR') %}
+                <button class="btn btn-outline-primary" type="button" data-bs-toggle="modal" data-bs-target="#modal-proveedor"><i class="ti ti-plus" aria-hidden="true"></i> Nuevo</button>
+              {% endif %}
+            </div>
+            {% if not tiene_rol(usuario, 'SUPERVISOR') %}
+              <div class="form-text">¿No aparece? El supervisor de mantenimiento lo registra en Data → Proveedores.</div>
+            {% endif %}
+          </div>
+
+          {% set programa = valores.get('programa', '' if orden.pertenece_programa is none else ('SI' if orden.pertenece_programa else 'NO')) %}
+          {% set marcadas = valores.get('tarea_id', vinculadas_ids) %}
+          <fieldset class="mb-3 border rounded p-3" id="bloque-programa">
+            <legend class="form-label fs-6 fw-medium mb-2">¿Corresponde al programa de mantenimiento de {{ orden.generador or orden.lancha }}? <span class="text-danger">*</span></legend>
+            {% if orden.tipo == 'PREVENTIVO' %}
+              <p class="small mb-2"><i class="ti ti-calendar-event" aria-hidden="true"></i> Sí: esta ODS es del programa ({{ orden.actividad }}).
+                Si en el mismo servicio se cumplieron otras tareas del programa, márcalas para que también se reprogramen.</p>
+            {% else %}
+              <div class="btn-group flex-wrap mb-2" role="group">
+                <input type="radio" class="btn-check" name="programa" id="programa-si" value="SI" autocomplete="off"{% if programa == 'SI' %} checked{% endif %} required>
+                <label class="btn btn-outline-primary" for="programa-si"><i class="ti ti-calendar-event" aria-hidden="true"></i> Sí, cumple tareas del programa</label>
+                <input type="radio" class="btn-check" name="programa" id="programa-no" value="NO" autocomplete="off"{% if programa == 'NO' %} checked{% endif %}>
+                <label class="btn btn-outline-primary" for="programa-no">No, no estaba en el programa</label>
+              </div>
+            {% endif %}
+            <div id="tareas-programa"{% if orden.tipo != 'PREVENTIVO' and programa != 'SI' %} hidden{% endif %}>
+              {% for t in tareas_programa %}
+                {% set propia = orden.tarea_id == t.tarea_id %}
+                <div class="form-check py-1">
+                  <input class="form-check-input" type="checkbox" name="tarea_id" value="{{ t.tarea_id }}" id="tarea-{{ t.tarea_id }}"
+                         {% if propia or (t.tarea_id|string) in marcadas %}checked{% endif %}{% if propia %} disabled{% endif %}>
+                  <label class="form-check-label" for="tarea-{{ t.tarea_id }}">
+                    <strong>{{ t.actividad }}</strong>
+                    <span class="small text-secondary">· cada {{ [(t.intervalo_horas|num(0) ~ ' h') if t.intervalo_horas else none, (t.intervalo_dias ~ ' días') if t.intervalo_dias else none]|select|join(' / ') }} · próximo {{ proximo(t) }}</span>
+                    {{ badge_tarea(t.estado) }}
+                    {% if t.ot_pendiente and t.ot_pendiente != orden.id %}
+                      <span class="badge text-bg-light border">ODS #{{ t.ot_pendiente }} pendiente: se cancela al aprobar esta</span>
+                    {% endif %}
+                  </label>
+                </div>
+              {% else %}
+                <p class="small text-secondary mb-0">Esta maquinaria no tiene tareas en su programa.</p>
+              {% endfor %}
+              <div class="form-text">Al aprobar la ODS, cada tarea marcada se reprograma desde el horómetro y la fecha de este servicio.</div>
+            </div>
+          </fieldset>
+
+          {% if orden.tipo == 'CORRECTIVO' and not orden.falla_id %}
+            {% set aplica = 'GENERADOR' if orden.tipo_equipo == 'GENERADOR' else 'LANCHA' %}
+            {% set item_elegido = valores.get('item_id', orden.item_id)|string %}
+            <div class="mb-3">
+              <label class="form-label" for="f-item">¿Qué falló?</label>
+              <select class="form-select" id="f-item" name="item_id">
+                <option value="">— Otra cosa (no está en la lista) —</option>
+                {% for categoria, items in items_falla|selectattr('aplica_a', 'equalto', aplica)|groupby('categoria') %}
+                  <optgroup label="{{ categoria }}">
+                    {% for i in items %}<option value="{{ i.id }}"{% if i.id|string == item_elegido %} selected{% endif %}>{{ i.nombre }}</option>{% endfor %}
+                  </optgroup>
+                {% endfor %}
+              </select>
+              <div class="form-text">Sirve para saber cuáles son las fallas más recurrentes. Es la misma lista de la inspección de la bitácora.</div>
+            </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label" for="f-diagnostico">Diagnóstico antes del trabajo</label>
+            <textarea class="form-control" id="f-diagnostico" name="diagnostico" rows="4"
+                      placeholder="Qué se encontró al revisar el equipo">{{ valores.get('diagnostico', orden.diagnostico or '') }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="f-requerido">Descripción del servicio de mantenimiento requerido</label>
+            <textarea class="form-control" id="f-requerido" name="servicio_requerido" rows="4">{{ valores.get('servicio_requerido', orden.servicio_requerido or orden.actividad_descripcion or orden.descripcion) }}</textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="f-realizado">Descripción del servicio de mantenimiento realizado <span class="text-danger">*</span></label>
+            <textarea class="form-control" id="f-realizado" name="trabajo_realizado" rows="6" required>{{ valores.get('trabajo_realizado', orden.trabajo_realizado or '') }}</textarea>
+          </div>
+
+          <div class="row">
+            <div class="col-sm-6 col-lg-4 mb-3">
+              <label class="form-label" for="f-fecha">Fecha de ejecución <span class="text-danger">*</span></label>
+              <input class="form-control" type="date" id="f-fecha" name="fecha_ejecucion" max="{{ hoy }}"
+                     value="{{ valores.get('fecha_ejecucion', orden.fecha_ejecucion or hoy) }}" required>
+            </div>
+            {% set horometro_condicional = orden.tipo == 'CORRECTIVO' and orden.tipo_equipo != 'GENERADOR' %}
+            {% if orden.equipo_id or tareas_programa %}
+            <div class="col-sm-6 col-lg-4 mb-3" id="bloque-horometro"{% if horometro_condicional %} data-condicional="1"{% endif %}>
+              <label class="form-label" for="f-horometro">Horómetro {{ 'del generador' if orden.tipo_equipo == 'GENERADOR' else 'de la lancha' }} <span class="text-danger">*</span></label>
+              <div class="input-group">
+                <input class="form-control" type="number" step="0.1" min="0" inputmode="decimal" id="f-horometro"
+                       name="horometro_ejecucion" value="{{ valores.get('horometro_ejecucion', orden.horometro_ejecucion if orden.horometro_ejecucion is not none else '') }}" required>
+                <span class="input-group-text">h</span>
+              </div>
+              {% set ultimo = orden.horometro_actual if orden.horometro_actual is not none else (tareas_programa[0].horometro_actual if tareas_programa else none) %}
+              {% if ultimo is not none %}<div class="form-text">Último registrado: {{ ultimo|num }} h.</div>{% endif %}
+            </div>
+            {% endif %}
+          </div>
+
+          {% set fuera = valores.get('fuera_servicio', '' if orden.fuera_servicio is none else ('SI' if orden.fuera_servicio else 'NO')) %}
+          {% set unidad = 'el generador' if orden.tipo_equipo == 'GENERADOR' else 'la lancha' %}
+          <fieldset class="mb-3 border rounded p-3" id="bloque-tiempos">
+            <legend class="form-label fs-6 fw-medium mb-2"><i class="ti ti-clock-hour-4" aria-hidden="true"></i> Tiempos</legend>
+            <p class="small fw-medium mb-2">¿{{ unidad|capitalize }} quedó fuera de servicio por esta {{ 'falla' if orden.tipo == 'CORRECTIVO' else 'tarea' }}? <span class="text-danger">*</span></p>
+            <div class="btn-group flex-wrap mb-3" role="group">
+              <input type="radio" class="btn-check" name="fuera_servicio" id="fuera-si" value="SI" autocomplete="off"{% if fuera == 'SI' %} checked{% endif %} required>
+              <label class="btn btn-outline-primary" for="fuera-si"><i class="ti ti-player-pause" aria-hidden="true"></i> Sí, no pudo operar</label>
+              <input type="radio" class="btn-check" name="fuera_servicio" id="fuera-no" value="NO" autocomplete="off"{% if fuera == 'NO' %} checked{% endif %}>
+              <label class="btn btn-outline-primary" for="fuera-no">No, siguió operando</label>
+            </div>
+
+            <div class="row" id="bloque-fuera"{% if fuera != 'SI' %} hidden{% endif %}>
+              <div class="col-sm-6 mb-3">
+                <label class="form-label" for="f-fuera-desde">Fuera de servicio desde <span class="text-danger">*</span></label>
+                <input class="form-control" type="datetime-local" id="f-fuera-desde" name="fuera_servicio_desde"
+                       value="{{ valores.get('fuera_servicio_desde', (orden.fuera_servicio_desde or orden.fecha_apertura)|valor_fechahora) }}">
+                <div class="form-text">Cuándo dejó de poder operar (la hora de la avería).</div>
+              </div>
+              <div class="col-sm-6 mb-3">
+                <label class="form-label" for="f-fuera-hasta">Volvió a operar <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input class="form-control" type="datetime-local" id="f-fuera-hasta" name="fuera_servicio_hasta"
+                         value="{{ valores.get('fuera_servicio_hasta', orden.fuera_servicio_hasta|valor_fechahora) }}">
+                  <button class="btn btn-outline-secondary" type="button" id="hasta-ahora">Ahora</button>
+                </div>
+                <div class="form-text">Si sigue parada, déjalo vacío y usa «Guardar avance».</div>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="col-sm-6 mb-3">
+                <label class="form-label" for="f-reparacion">Duración del trabajo <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <input class="form-control" type="number" step="0.25" min="0" inputmode="decimal" id="f-reparacion" name="horas_reparacion"
+                         value="{{ valores.get('horas_reparacion', orden.horas_reparacion|cantidad) }}" required>
+                  <span class="input-group-text">h</span>
+                </div>
+                <div class="form-text">Horas de trabajo efectivo en la reparación, de reloj.{% if orden.tiempo_estimado_h %} Estimado: {{ orden.tiempo_estimado_h|horas(2) }}.{% endif %}</div>
+              </div>
+              <div class="col-sm-6 mb-3">
+                <label class="form-label" for="f-hh">Horas-hombre</label>
+                <input class="form-control" type="number" step="0.25" min="0" inputmode="decimal" id="f-hh" name="horas_hombre"
+                       value="{{ valores.get('horas_hombre', orden.horas_hombre if orden.horas_hombre is not none else '') }}">
+                <div class="form-text">Por persona: 2 mecánicos durante 3 h son 3 h de trabajo y 6 horas-hombre.</div>
+              </div>
+            </div>
+
+            <div id="bloque-externos"{% if fuera != 'SI' %} hidden{% endif %}>
+              <div class="resumen-tiempos small mb-2" id="resumen-tiempos" aria-live="polite"></div>
+              <div data-filas="demoras">
+                <span class="form-label d-block">¿Por qué estuvo fuera de servicio más tiempo del que duró el trabajo?</span>
+                <div class="d-grid gap-2" data-lista>
+                  {% for fila in filas_demoras %}{{ fila_demora(motivos, fila) }}{% endfor %}
+                </div>
+                <template>{{ fila_demora(motivos) }}</template>
+                <button type="button" class="btn btn-outline-primary mt-2" data-agregar><i class="ti ti-plus" aria-hidden="true"></i> Agregar motivo</button>
+                <div class="form-text">Factores externos: el repuesto no se conseguía, la avería fue fuera del horario laboral… La lista se edita en Data.</div>
+              </div>
+            </div>
+          </fieldset>
+
+          {{ lista_materiales(opciones_materiales, filas_materiales, 'Herramientas y repuestos usados',
+                nuevo=tiene_rol(usuario, 'SUPERVISOR'),
+                ayuda='' if tiene_rol(usuario, 'SUPERVISOR') else '¿No aparece? El supervisor de mantenimiento lo registra en Data → Herramientas y repuestos; mientras tanto, escríbelo abajo.') }}
+          <div class="mb-3">
+            <label class="form-label" for="f-materiales">Otros materiales</label>
+            <textarea class="form-control" id="f-materiales" name="materiales_usados" rows="2"
+                      placeholder="Lo que no está en la lista">{{ valores.get('materiales_usados', orden.materiales_usados or '') }}</textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="f-fotos"><i class="ti ti-camera" aria-hidden="true"></i> Fotos del servicio</label>
+            <input class="form-control" type="file" id="f-fotos" name="fotos" accept="image/*" multiple>
+            <div class="form-text">Se reducen en la tablet antes de enviarlas (sin perder calidad visible). Hasta 12 por envío.</div>
+            <div class="row g-2 mt-1" id="previas"></div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" for="f-observaciones">Observaciones</label>
+            <textarea class="form-control" id="f-observaciones" name="observaciones" rows="3">{{ valores.get('observaciones', orden.observaciones or '') }}</textarea>
+          </div>
+
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-outline-primary" formaction="/ordenes/{{ orden.id }}/guardar" formnovalidate>
+              <i class="ti ti-device-floppy" aria-hidden="true"></i> Guardar avance</button>
+            <button class="btn btn-success btn-lg">Reportar como ejecutada</button>
+            {% if 'ejecutar_aprobar' in acciones %}
+              <button class="btn btn-outline-success btn-lg" formaction="/ordenes/{{ orden.id }}/ejecutar_aprobar"
+                      data-confirmar="Vas a reportar y aprobar esta ODS en un solo paso. ¿Continuar?">Reportar y aprobar</button>
+            {% endif %}
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ---------------- Fotos ---------------- #}
+    {% if galeria or ('fotos' in acciones and 'ejecutar' not in acciones) %}
+    <div class="card mb-3" id="fotos">
+      <div class="card-header"><i class="ti ti-photo" aria-hidden="true"></i> Fotos del servicio ({{ galeria|length }})</div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% for f in galeria %}
+            <div class="col-6 col-md-4 col-xl-3">
+              <figure class="mb-0 position-relative">
+                <a href="/ordenes/{{ orden.id }}/fotos/{{ f.id }}" target="_blank" rel="noopener">
+                  <img class="img-fluid rounded border" src="/ordenes/{{ orden.id }}/fotos/{{ f.id }}?mini=1" alt="Foto {{ loop.index }} de la ODS" loading="lazy">
+                </a>
+                <figcaption class="small text-secondary mt-1">{{ f.subido_en|fechahora }}{% if f.subido_nombre %} · {{ f.subido_nombre }}{% endif %}</figcaption>
+                {% if 'fotos' in acciones and (tiene_rol(usuario, 'SUPERVISOR') or f.subido_por == usuario.id) %}
+                  <form method="post" action="/ordenes/{{ orden.id }}/fotos/{{ f.id }}/eliminar" class="position-absolute top-0 end-0 m-1"
+                        data-confirmar="¿Quitar esta foto?">
+                    {{ csrf_input }}
+                    <button class="btn btn-sm btn-light border" aria-label="Quitar foto {{ loop.index }}"><i class="ti ti-trash" aria-hidden="true"></i></button>
+                  </form>
+                {% endif %}
+              </figure>
+            </div>
+          {% else %}
+            <div class="col-12 text-secondary small">Sin fotos.</div>
+          {% endfor %}
+        </div>
+        {% if 'fotos' in acciones and 'ejecutar' not in acciones %}
+          <form method="post" action="/ordenes/{{ orden.id }}/fotos" enctype="multipart/form-data" class="mt-3 d-flex flex-wrap gap-2">
+            {{ csrf_input }}
+            <input class="form-control w-auto flex-grow-1" type="file" id="f-fotos" name="fotos" accept="image/*" multiple required aria-label="Agregar fotos">
+            <button class="btn btn-outline-primary"><i class="ti ti-upload" aria-hidden="true"></i> Agregar fotos</button>
+            <div class="row g-2 w-100" id="previas"></div>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'cerrar' in acciones %}
+    <div class="card mb-3 border-success">
+      <div class="card-header fw-semibold"><i class="ti ti-user-check" aria-hidden="true"></i> Aprobación del supervisor de mantenimiento</div>
+      <div class="card-body">
+        {% if orden.ejecutado_por == usuario.id %}<p class="small text-secondary">Este servicio lo reportaste tú: al aprobarlo quedará como autoaprobado en el historial.</p>{% endif %}
+        <form method="post">
+          {{ csrf_input }}
+          <label class="form-label" for="f-comentario">Comentario <span class="text-secondary small">(obligatorio para devolver)</span></label>
+          <textarea class="form-control mb-3" id="f-comentario" name="comentario" rows="2">{{ valores.get('comentario', '') }}</textarea>
+          <div class="d-flex flex-wrap gap-2">
+            <button class="btn btn-success" formaction="/ordenes/{{ orden.id }}/cerrar">Aprobar y cerrar ODS{{ ' (reinicia el programa)' if orden.tipo == 'PREVENTIVO' else '' }}</button>
+            <button class="btn btn-outline-warning" formaction="/ordenes/{{ orden.id }}/devolver">Devolver al mecánico</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if 'asignar' in acciones or 'liberar' in acciones or 'cancelar' in acciones %}
+    <details class="mb-3">
+      <summary class="text-secondary">Más acciones</summary>
+      <div class="card card-body mt-2">
+        {% if 'asignar' in acciones %}
+          <form method="post" action="/ordenes/{{ orden.id }}/asignar" class="d-flex flex-wrap gap-2 mb-3">
+            {{ csrf_input }}
+            <select class="form-select w-auto flex-grow-1" name="asignado_a" aria-label="Asignar a">
+              <option value="">— Sin asignar —</option>
+              {% for t in tecnicos %}<option value="{{ t.id }}"{% if t.id == orden.asignado_a %} selected{% endif %}>{{ t.nombre }}</option>{% endfor %}
+            </select>
+            <button class="btn btn-outline-primary">Asignar</button>
+          </form>
+        {% endif %}
+        {% if 'liberar' in acciones %}
+          <form method="post" action="/ordenes/{{ orden.id }}/liberar" class="mb-3">
+            {{ csrf_input }}
+            <button class="btn btn-outline-secondary">Liberar (dejarla disponible para otro)</button>
+          </form>
+        {% endif %}
+        {% if 'cancelar' in acciones %}
+          <form method="post" action="/ordenes/{{ orden.id }}/cancelar" class="d-flex flex-wrap gap-2">
+            {{ csrf_input }}
+            <input class="form-control w-auto flex-grow-1" name="comentario" placeholder="Motivo de la cancelación" required>
+            <button class="btn btn-outline-danger">Cancelar ODS</button>
+          </form>
+        {% endif %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+
+  <div class="col-xl-4">
+    <h2 class="h5">Historial</h2>
+    <ol class="list-group list-group-numbered">
+      {% for h in historial %}
+        <li class="list-group-item">
+          <span class="fw-semibold">{{ badge_ot(h.estado_nuevo) }}</span>
+          <span class="small text-secondary">{{ h.fecha|fechahora }}{% if h.usuario %} · {{ h.usuario }}{% endif %}</span>
+          {% if h.comentario %}<div class="small mt-1">{{ h.comentario }}</div>{% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+
+{% if 'ejecutar' in acciones and tiene_rol(usuario, 'SUPERVISOR') %}
+{{ modal_catalogo(cat_materiales, '', sugerencias_materiales) }}
+<div class="modal fade" id="modal-proveedor" tabindex="-1" aria-labelledby="modal-proveedor-titulo" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="modal-proveedor-titulo">Nuevo proveedor</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label" for="np-nombre">Nombre o razón social</label>
+        <input class="form-control mb-2" id="np-nombre" maxlength="150" autocomplete="off">
+        <label class="form-label" for="np-rif">RIF</label>
+        <input class="form-control mb-2" id="np-rif" maxlength="20" placeholder="J-12345678-9" autocomplete="off">
+        <label class="form-label" for="np-telefono">Teléfono</label>
+        <input class="form-control" id="np-telefono" type="tel" autocomplete="off">
+        <div class="form-text">Los demás datos se completan en Data → Proveedores.</div>
+        <div class="text-danger small mt-2" id="np-error" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" id="np-guardar">Registrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if 'ejecutar' in acciones %}{{ script_filas() }}{% endif %}
+<script>
+  // Tiempos: con «Sí» se piden las horas fuera de servicio y los motivos de los factores externos.
+  // El resumen se recalcula al escribir y una fila nueva propone las horas que faltan por repartir.
+  const bloqueTiempos = document.getElementById('bloque-tiempos');
+  if (bloqueTiempos) {
+    const campo = id => document.getElementById(id);
+    const bloqueDemoras = bloqueTiempos.querySelector('[data-filas="demoras"]');
+    const formato = horas => `${Number(horas.toFixed(2))} h`;
+    const fueraSi = () => campo('fuera-si').checked;
+
+    function horasFuera() {
+      const desde = campo('f-fuera-desde').value, hasta = campo('f-fuera-hasta').value;
+      if (!desde) return null;
+      const fin = hasta ? new Date(hasta) : new Date();
+      return Math.max(0, (fin - new Date(desde)) / 3600000);
+    }
+    const repartidas = () => [...bloqueDemoras.querySelectorAll('input[name="demora_horas"]')]
+      .reduce((suma, entrada) => suma + (parseFloat(entrada.value.replace(',', '.')) || 0), 0);
+    function porRepartir() {
+      const fuera = horasFuera();
+      if (fuera === null) return null;
+      const trabajo = parseFloat(campo('f-reparacion').value.replace(',', '.')) || 0;
+      return Math.max(0, fuera - trabajo) - repartidas();
+    }
+
+    function actualizar() {
+      const si = fueraSi();
+      campo('bloque-fuera').hidden = !si;
+      campo('bloque-externos').hidden = !si;
+      campo('f-fuera-desde').required = si;
+      campo('f-fuera-hasta').required = si;   // «Guardar avance» no valida: ahí puede quedar vacío
+      const resumen = campo('resumen-tiempos');
+      const fuera = horasFuera();
+      if (!si || fuera === null) { resumen.textContent = ''; return; }
+      const trabajo = parseFloat(campo('f-reparacion').value.replace(',', '.')) || 0;
+      const externas = Math.max(0, fuera - trabajo);
+      const resto = externas - repartidas();
+      resumen.replaceChildren();
+      const partes = [
+        [`Fuera de servicio${campo('f-fuera-hasta').value ? '' : ' hasta ahora'}: `, formato(fuera)],
+        [' · Trabajo: ', formato(trabajo)],
+        [' · Factores externos: ', formato(externas)],
+      ];
+      partes.forEach(([texto, valor]) => {
+        resumen.append(texto);
+        const fuerte = document.createElement('strong');
+        fuerte.textContent = valor;
+        resumen.append(fuerte);
+      });
+      const nota = document.createElement('div');
+      if (trabajo > fuera + 0.01) {
+        nota.className = 'text-danger';
+        nota.textContent = 'La duración del trabajo no puede ser mayor que el tiempo fuera de servicio.';
+      } else if (resto < -0.01) {
+        nota.className = 'text-danger';
+        nota.textContent = `Los motivos suman ${formato(-resto)} de más.`;
+      } else if (resto > 0.01) {
+        nota.className = 'text-secondary';
+        nota.textContent = `Sin motivo indicado: ${formato(resto)}.`;
+      }
+      resumen.append(nota);
+    }
+
+    bloqueTiempos.addEventListener('input', actualizar);
+    bloqueTiempos.addEventListener('change', actualizar);
+    bloqueDemoras.addEventListener('fila-agregada', evento => {
+      const resto = porRepartir();
+      if (resto > 0.01) evento.detail.querySelector('input[name="demora_horas"]').value = Math.round(resto * 100) / 100;
+      actualizar();
+    });
+    campo('hasta-ahora').addEventListener('click', () => {
+      const ahora = new Date();
+      ahora.setMinutes(ahora.getMinutes() - ahora.getTimezoneOffset());
+      campo('f-fuera-hasta').value = ahora.toISOString().slice(0, 16);
+      actualizar();
+    });
+    actualizar();
+  }
+
+  // Proveedor: solo se pide cuando el servicio es contratado
+  const bloqueProveedor = document.getElementById('bloque-proveedor');
+  if (bloqueProveedor) {
+    const selectorProveedor = document.getElementById('f-proveedor');
+    const alternar = () => {
+      const contratado = document.getElementById('servicio-contratado').checked;
+      bloqueProveedor.hidden = !contratado;
+      selectorProveedor.required = contratado;
+    };
+    document.querySelectorAll('input[name="servicio"]').forEach(r => r.addEventListener('change', alternar));
+    alternar();
+  }
+
+  // Programa: con "Sí" se muestran las tareas (y el horómetro, si es una ODS de lancha)
+  const tareasPrograma = document.getElementById('tareas-programa');
+  const opcionesPrograma = document.querySelectorAll('input[name="programa"]');
+  if (tareasPrograma && opcionesPrograma.length) {
+    const bloqueHorometro = document.getElementById('bloque-horometro');
+    const alternarPrograma = () => {
+      const si = document.getElementById('programa-si').checked;
+      tareasPrograma.hidden = !si;
+      if (bloqueHorometro && bloqueHorometro.dataset.condicional) {
+        bloqueHorometro.hidden = !si;
+        document.getElementById('f-horometro').required = si;
+      }
+    };
+    opcionesPrograma.forEach(r => r.addEventListener('change', alternarPrograma));
+    alternarPrograma();
+  }
+
+  // Alta rápida de proveedor (solo supervisor)
+  const modalProveedor = document.getElementById('modal-proveedor');
+  if (modalProveedor) {
+    const campo = id => document.getElementById(id);
+    modalProveedor.addEventListener('shown.bs.modal', () => {
+      ['np-nombre', 'np-rif', 'np-telefono'].forEach(id => campo(id).value = '');
+      campo('np-error').textContent = '';
+      campo('np-nombre').focus();
+    });
+    campo('np-guardar').addEventListener('click', async () => {
+      const nombre = campo('np-nombre').value.trim();
+      if (!nombre) { campo('np-error').textContent = 'Escribe el nombre del proveedor.'; return; }
+      const datos = new URLSearchParams({ nombre, rif: campo('np-rif').value.trim(), telefono: campo('np-telefono').value.trim(),
+                                          csrf: document.querySelector('input[name="csrf"]').value });
+      const respuesta = await fetch('/data/proveedores', { method: 'POST', body: datos, headers: { Accept: 'application/json' } });
+      const resultado = await respuesta.json().catch(() => ({ error: 'No se pudo guardar. Intenta de nuevo.' }));
+      if (!respuesta.ok) { campo('np-error').textContent = resultado.error || 'No se pudo guardar.'; return; }
+      campo('f-proveedor').add(new Option(resultado.nombre, resultado.id, true, true));
+      bootstrap.Modal.getOrCreateInstance(modalProveedor).hide();
+    });
+  }
+
+  // Fotos: se reducen en el navegador antes de subirlas (máx. 1920 px, JPEG 82 %)
+  const entradaFotos = document.getElementById('f-fotos');
+  if (entradaFotos && window.DataTransfer) {
+    const tamano = bytes => bytes > 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${Math.round(bytes / 1024)} KB`;
+    async function comprimir(archivo) {
+      if (!archivo.type.startsWith('image/')) return archivo;
+      const imagen = await createImageBitmap(archivo, { imageOrientation: 'from-image' });
+      const escala = Math.min(1, 1920 / Math.max(imagen.width, imagen.height));
+      const lienzo = document.createElement('canvas');
+      lienzo.width = Math.round(imagen.width * escala);
+      lienzo.height = Math.round(imagen.height * escala);
+      lienzo.getContext('2d').drawImage(imagen, 0, 0, lienzo.width, lienzo.height);
+      const blob = await new Promise(listo => lienzo.toBlob(listo, 'image/jpeg', 0.82));
+      if (!blob || blob.size >= archivo.size) return archivo;
+      return new File([blob], archivo.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+    }
+    entradaFotos.addEventListener('change', async () => {
+      const previas = document.getElementById('previas');
+      previas.replaceChildren();
+      const seleccion = new DataTransfer();
+      for (const original of entradaFotos.files) {
+        let final = original;
+        try { final = await comprimir(original); } catch (e) { /* el servidor la procesa igual */ }
+        seleccion.items.add(final);
+        const columna = document.createElement('div');
+        columna.className = 'col-4 col-md-3 col-xl-2';
+        const imagen = document.createElement('img');
+        imagen.className = 'img-fluid rounded border';
+        imagen.alt = original.name;
+        imagen.src = URL.createObjectURL(final);
+        const nota = document.createElement('div');
+        nota.className = 'small text-secondary';
+        nota.textContent = final === original ? tamano(original.size) : `${tamano(original.size)} → ${tamano(final.size)}`;
+        columna.append(imagen, nota);
+        previas.append(columna);
+      }
+      entradaFotos.files = seleccion.files;
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "macros.html" import campo, area, casilla %}
+{% block titulo %}Editar proveedor{% endblock %}
+{% block contenido %}
+<nav aria-label="Ruta"><a href="/data/proveedores" class="small text-decoration-none"><i class="ti ti-arrow-back-up" aria-hidden="true"></i> Proveedores</a></nav>
+<h1><i class="ti ti-building-store" aria-hidden="true"></i> Editar proveedor</h1>
+<form method="post" class="card card-body" style="max-width: 40rem">
+  {{ csrf_input }}
+  {{ campo('nombre', 'Nombre o razón social', proveedor, requerido=true, attrs='maxlength="150"') }}
+  <div class="row">
+    <div class="col-sm-6">{{ campo('rif', 'RIF', proveedor, attrs='maxlength="20"') }}</div>
+    <div class="col-sm-6">{{ campo('especialidad', 'Especialidad', proveedor) }}</div>
+  </div>
+  <div class="row">
+    <div class="col-sm-4">{{ campo('contacto', 'Persona de contacto', proveedor) }}</div>
+    <div class="col-sm-4">{{ campo('telefono', 'Teléfono', proveedor, tipo='tel') }}</div>
+    <div class="col-sm-4">{{ campo('correo', 'Correo', proveedor, tipo='email') }}</div>
+  </div>
+  {{ area('notas', 'Notas', proveedor, filas=2) }}
+  {{ casilla('activo', 'Activo (aparece al reportar una ODS contratada)', proveedor.activo) }}
+  <div class="d-flex gap-2">
+    <button class="btn btn-primary">Guardar</button>
+    <a class="btn btn-outline-secondary" href="/data/proveedores">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

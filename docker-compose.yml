@@ -1,0 +1,48 @@
+# Base común para desarrollo y producción.
+#   Desarrollo:  docker compose up -d --build        (agrega docker-compose.override.yml)
+#   Producción:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+services:
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mantenimiento
+      POSTGRES_USER: mantenimiento
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Define POSTGRES_PASSWORD en .env}
+      TZ: ${TZ:-UTC}
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./db:/db:ro          # scripts y pruebas: /db/scripts, /db/pruebas
+    # Sin "ports": la base nunca se expone a internet.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mantenimiento -d mantenimiento -h 127.0.0.1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://mantenimiento:${POSTGRES_PASSWORD}@db:5432/mantenimiento
+      SECRET_KEY: ${SECRET_KEY:?Define SECRET_KEY en .env}
+      ADMIN_USUARIO: ${ADMIN_USUARIO:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      TZ: ${TZ:-UTC}
+      COOKIE_SEGURA: ${COOKIE_SEGURA:-false}
+      CARGAR_DEMO: ${CARGAR_DEMO:-false}     # datos ficticios de db/demo (solo la copia piloto)
+      DEMO_PASSWORD: ${DEMO_PASSWORD:-}
+    volumes:
+      - fotos:/srv/datos/fotos   # fotos de las ODS (se respaldan con deploy/respaldo.sh)
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/salud')\""]
+      interval: 10s
+      timeout: 3s
+      retries: 6
+
+volumes:
+  pgdata:
+  fotos:

@@ -1,0 +1,25 @@
+# Producción en el VPS: Caddy recibe el tráfico en 80/443, obtiene el
+# certificado HTTPS automáticamente y lo reenvía a la app.
+services:
+  app:
+    environment:
+      COOKIE_SEGURA: "true"
+
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      DOMINIO: ${DOMINIO:?Define DOMINIO en .env, ej. mantenimiento.tuempresa.com}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
